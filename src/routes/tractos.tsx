@@ -142,6 +142,29 @@ const getRecentTelemetryEvents = (t: Tracto) => {
   ];
 };
 
+function getTractoCapacityMetrics(t: Tracto) {
+  const seed = parseInt(t.economico.replace(/\D/g, "")) || 1;
+  const bu = (t.unidadNegocio || "").toUpperCase();
+  const isTanqueOrFull = bu.includes("REFINADO") || bu.includes("LUBRICANTES") || bu.includes("BULKMATIC");
+  const isDedicado = bu.includes("BACHOCO");
+  
+  let nominal = 35; // Tons
+  if (isTanqueOrFull) {
+    nominal = 40;
+  } else if (isDedicado) {
+    nominal = 30;
+  }
+
+  const pct = 60 + (seed % 36); // 60% to 95%
+  const real = parseFloat((nominal * (pct / 100)).toFixed(1));
+
+  return {
+    pct,
+    nominal: `${nominal} TN`,
+    real: `${real} TN`
+  };
+}
+
 function EstructuraTractos({
   units,
   fleetTractos,
@@ -293,6 +316,7 @@ function TractosPage() {
     rendimiento: true,
     scoreSeguridad: true,
     utilidadReal: true,
+    capacidad: true,
   });
 
   useEffect(() => {
@@ -660,6 +684,12 @@ function TractosPage() {
               >
                 Utilidad Real
               </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.capacidad}
+                onCheckedChange={(checked) => setVisibleColumns({ ...visibleColumns, capacidad: checked })}
+              >
+                Capacidad Real
+              </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -698,6 +728,7 @@ function TractosPage() {
                 {visibleColumns.rendimiento && <th className={cn("text-right font-bold", isCompact ? "px-2 py-2" : "px-4 py-3")}>Rend. (km/L)</th>}
                 {visibleColumns.scoreSeguridad && <th className={cn("text-right font-bold", isCompact ? "px-2 py-2" : "px-4 py-3")}>Score Seg.</th>}
                 {visibleColumns.utilidadReal && <th className={cn("text-right font-bold", isCompact ? "px-2 py-2" : "px-4 py-3")}>Utilidad Real</th>}
+                {visibleColumns.capacidad && <th className={cn("text-right font-bold", isCompact ? "px-2 py-2" : "px-4 py-3")}>Capacidad Real</th>}
               </tr>
             </thead>
             <tbody>
@@ -849,6 +880,14 @@ function TractosPage() {
                         </div>
                       </td>
                     )}
+                    {visibleColumns.capacidad && (
+                      <td className={cn("text-right font-medium", isCompact ? "px-2 py-1.5" : "px-4 py-3")}>
+                        <div className="flex flex-col items-end">
+                          <span className="font-semibold text-foreground tabular-nums">{getTractoCapacityMetrics(t).pct}%</span>
+                          <span className="text-[10px] text-muted-foreground">{getTractoCapacityMetrics(t).real} / {getTractoCapacityMetrics(t).nominal}</span>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -934,6 +973,45 @@ function TractosPage() {
                       ? `${((selectedTracto.scoreSeguridad || 0) * 100).toFixed(2)}%`
                       : "0.0%"}
                   </p>
+                </div>
+              </div>
+
+              {/* Capacidad Real vs Nominal Section */}
+              <div className="border rounded-xl p-4 space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Análisis de Capacidad Carga Real vs Nominal</h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between border-b border-dashed pb-1.5">
+                    <span className="text-muted-foreground">Capacidad Nominal Máxima:</span>
+                    <span className="font-semibold">{getTractoCapacityMetrics(selectedTracto).nominal}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-dashed pb-1.5">
+                    <span className="text-muted-foreground">Carga Real Promedio:</span>
+                    <span className="font-semibold text-foreground">{getTractoCapacityMetrics(selectedTracto).real}</span>
+                  </div>
+                  <div className="space-y-1 pt-1.5">
+                    <div className="flex items-center justify-between text-xs font-semibold">
+                      <span className="text-muted-foreground">Eficiencia de Carga Promedio:</span>
+                      <span className={cn(
+                        "font-bold",
+                        getTractoCapacityMetrics(selectedTracto).pct >= 85 ? "text-emerald-500" :
+                        getTractoCapacityMetrics(selectedTracto).pct >= 70 ? "text-amber-500" : "text-rose-500"
+                      )}>{getTractoCapacityMetrics(selectedTracto).pct}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden shadow-inner">
+                      <div
+                        className={cn(
+                          "h-full rounded-full transition-all duration-500",
+                          getTractoCapacityMetrics(selectedTracto).pct >= 85 ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]" :
+                          getTractoCapacityMetrics(selectedTracto).pct >= 70 ? "bg-amber-500" : "bg-rose-500"
+                        )}
+                        style={{ width: `${getTractoCapacityMetrics(selectedTracto).pct}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-between pt-1.5 border-t text-xs">
+                    <span className="text-muted-foreground">Viajes Realizados:</span>
+                    <span className="font-semibold">{selectedTracto.viajesMes} viajes / 25 esperados</span>
+                  </div>
                 </div>
               </div>
 

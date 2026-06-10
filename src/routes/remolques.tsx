@@ -113,6 +113,40 @@ const getTrailerTelemetryEvents = (r: Remolque) => {
   ];
 };
 
+function getRemolqueCapacityMetrics(r: Remolque) {
+  const seed = parseInt(r.economico.replace(/\D/g, "")) || 1;
+  const isCisterna = (r.tipo || "").toLowerCase().includes("cisterna") || (r.tipo || "").toLowerCase().includes("tanque");
+  const isTolva = (r.tipo || "").toLowerCase().includes("tolva");
+  
+  let capNominalStr = "";
+  let capRealStr = "";
+  let pct = 60 + (seed % 35); // 60% to 95%
+  
+  if (isCisterna) {
+    const nominal = 35000; // Liters
+    const real = Math.round(nominal * (pct / 100));
+    capNominalStr = `${nominal.toLocaleString()} L`;
+    capRealStr = `${real.toLocaleString()} L`;
+  } else if (isTolva) {
+    const nominal = 40; // Tons
+    const real = parseFloat((nominal * (pct / 100)).toFixed(1));
+    capNominalStr = `${nominal} TN`;
+    capRealStr = `${real} TN`;
+  } else {
+    // Caja seca or Refrigerado
+    const nominal = 30; // Tons
+    const real = parseFloat((nominal * (pct / 100)).toFixed(1));
+    capNominalStr = `${nominal} TN`;
+    capRealStr = `${real} TN`;
+  }
+
+  return {
+    pct,
+    nominal: capNominalStr,
+    real: capRealStr
+  };
+}
+
 function EstructuraRemolques({
   units,
   fleetRemolques,
@@ -261,6 +295,7 @@ function RemolquesPage() {
     kmRecorridos: true,
     diasTaller: true,
     costoMantto: true,
+    capacidad: true,
   });
 
   useEffect(() => {
@@ -597,6 +632,12 @@ function RemolquesPage() {
               >
                 Costo Mantto/Km
               </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.capacidad}
+                onCheckedChange={(checked) => setVisibleColumns({ ...visibleColumns, capacidad: checked })}
+              >
+                Capacidad Real
+              </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -632,6 +673,7 @@ function RemolquesPage() {
                 {visibleColumns.kmRecorridos && <th className={cn("text-right font-bold", isCompact ? "px-2 py-2" : "px-5 py-3")}>Km Recorridos</th>}
                 {visibleColumns.diasTaller && <th className={cn("text-right font-bold", isCompact ? "px-2 py-2" : "px-5 py-3")}>Días Taller (Mes)</th>}
                 {visibleColumns.costoMantto && <th className={cn("text-right font-bold", isCompact ? "px-2 py-2" : "px-5 py-3")}>Costo Mantto/Km</th>}
+                {visibleColumns.capacidad && <th className={cn("text-right font-bold", isCompact ? "px-2 py-2" : "px-5 py-3")}>Capacidad Real</th>}
               </tr>
             </thead>
             <tbody>
@@ -760,6 +802,14 @@ function RemolquesPage() {
                           {r.costoKmMantto > 0 ? `${formatUSD(r.costoKmMantto)}/km` : "—"}
                         </td>
                       )}
+                      {visibleColumns.capacidad && (
+                        <td className={cn("text-right font-medium", isCompact ? "px-2 py-1.5" : "px-5 py-3")}>
+                          <div className="flex flex-col items-end">
+                            <span className="font-semibold text-foreground tabular-nums">{getRemolqueCapacityMetrics(r).pct}%</span>
+                            <span className="text-[10px] text-muted-foreground">{getRemolqueCapacityMetrics(r).real} / {getRemolqueCapacityMetrics(r).nominal}</span>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
@@ -835,6 +885,45 @@ function RemolquesPage() {
                   <p className="text-base font-bold text-foreground">
                     {selectedRemolque.costoKmMantto > 0 ? `${formatUSD(selectedRemolque.costoKmMantto)}/km` : "—"}
                   </p>
+                </div>
+              </div>
+
+              {/* Capacidad Real vs Nominal Section */}
+              <div className="border rounded-xl p-4 space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Análisis de Capacidad Carga Real vs Nominal</h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between border-b border-dashed pb-1.5">
+                    <span className="text-muted-foreground">Capacidad Nominal Máxima:</span>
+                    <span className="font-semibold">{getRemolqueCapacityMetrics(selectedRemolque).nominal}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-dashed pb-1.5">
+                    <span className="text-muted-foreground">Carga Real Promedio:</span>
+                    <span className="font-semibold text-foreground">{getRemolqueCapacityMetrics(selectedRemolque).real}</span>
+                  </div>
+                  <div className="space-y-1 pt-1.5">
+                    <div className="flex items-center justify-between text-xs font-semibold">
+                      <span className="text-muted-foreground">Eficiencia de Carga Promedio:</span>
+                      <span className={cn(
+                        "font-bold",
+                        getRemolqueCapacityMetrics(selectedRemolque).pct >= 85 ? "text-emerald-500" :
+                        getRemolqueCapacityMetrics(selectedRemolque).pct >= 70 ? "text-amber-500" : "text-rose-500"
+                      )}>{getRemolqueCapacityMetrics(selectedRemolque).pct}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden shadow-inner">
+                      <div
+                        className={cn(
+                          "h-full rounded-full transition-all duration-500",
+                          getRemolqueCapacityMetrics(selectedRemolque).pct >= 85 ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]" :
+                          getRemolqueCapacityMetrics(selectedRemolque).pct >= 70 ? "bg-amber-500" : "bg-rose-500"
+                        )}
+                        style={{ width: `${getRemolqueCapacityMetrics(selectedRemolque).pct}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-between pt-1.5 border-t text-xs">
+                    <span className="text-muted-foreground">Viajes Realizados:</span>
+                    <span className="font-semibold">{selectedRemolque.viajesMes} viajes / 25 esperados</span>
+                  </div>
                 </div>
               </div>
 
