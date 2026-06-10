@@ -1,0 +1,258 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-glow: var(--primary-glow);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.22 0.04 250);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.04 250);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.04 250);
+
+  /* Corporate deep blue */
+  --primary: oklch(0.38 0.14 255);
+  --primary-foreground: oklch(0.99 0 0);
+  --primary-glow: oklch(0.55 0.16 255);
+
+  --secondary: oklch(0.96 0.012 250);
+  --secondary-foreground: oklch(0.30 0.06 255);
+
+  --muted: oklch(0.965 0.008 250);
+  --muted-foreground: oklch(0.50 0.03 255);
+
+  --accent: oklch(0.94 0.02 255);
+  --accent-foreground: oklch(0.30 0.08 255);
+
+  /* Gold for action buttons */
+  --gold: oklch(0.78 0.14 80);
+  --gold-foreground: oklch(0.22 0.04 250);
+
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.99 0 0);
+
+  --success: oklch(0.65 0.16 155);
+  --success-foreground: oklch(0.99 0 0);
+
+  --warning: oklch(0.78 0.15 65);
+  --warning-foreground: oklch(0.22 0.04 250);
+
+  --border: oklch(0.92 0.01 250);
+  --input: oklch(0.92 0.01 250);
+  --ring: oklch(0.55 0.16 255);
+
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.30 0.08 255);
+  --sidebar-primary: oklch(0.38 0.14 255);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.96 0.012 250);
+  --sidebar-accent-foreground: oklch(0.30 0.08 255);
+  --sidebar-border: oklch(0.92 0.01 250);
+  --sidebar-ring: oklch(0.55 0.16 255);
+
+  --gradient-primary: linear-gradient(135deg, var(--primary), var(--primary-glow));
+  --gradient-gold: linear-gradient(135deg, oklch(0.82 0.14 85), oklch(0.72 0.15 75));
+  --gradient-hero: linear-gradient(135deg, oklch(1 0 0) 0%, oklch(0.98 0.01 250) 100%);
+  --shadow-elegant: 0 10px 30px -10px color-mix(in oklab, var(--primary) 25%, transparent);
+  --shadow-card: 0 1px 3px 0 color-mix(in oklab, var(--primary) 8%, transparent), 0 1px 2px -1px color-mix(in oklab, var(--primary) 6%, transparent);
+  --shadow-gold: 0 8px 24px -8px color-mix(in oklab, var(--gold) 50%, transparent);
+}
+
+.dark {
+  --background: oklch(0.14 0.025 250);
+  --foreground: oklch(0.96 0.01 250);
+  --card: oklch(0.18 0.03 250 / 65%);
+  --card-foreground: oklch(0.96 0.01 250);
+  --popover: oklch(0.18 0.03 250 / 95%);
+  --popover-foreground: oklch(0.96 0.01 250);
+  --primary: oklch(0.65 0.16 255);
+  --primary-foreground: oklch(0.15 0.03 255);
+  --primary-glow: oklch(0.72 0.14 255);
+  --secondary: oklch(0.22 0.03 250);
+  --secondary-foreground: oklch(0.96 0.01 250);
+  --muted: oklch(0.20 0.03 250 / 80%);
+  --muted-foreground: oklch(0.65 0.02 250);
+  --accent: oklch(0.25 0.04 250);
+  --accent-foreground: oklch(0.96 0.01 250);
+  --gold: oklch(0.78 0.14 80);
+  --gold-foreground: oklch(0.18 0.03 255);
+  --destructive: oklch(0.65 0.20 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.70 0.16 155);
+  --success-foreground: oklch(0.15 0.03 255);
+  --warning: oklch(0.78 0.15 65);
+  --warning-foreground: oklch(0.18 0.03 255);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 10%);
+  --ring: oklch(0.65 0.16 255);
+  --sidebar: oklch(0.14 0.025 250 / 95%);
+  --sidebar-foreground: oklch(0.96 0.01 250);
+  --sidebar-primary: oklch(0.78 0.14 80);
+  --sidebar-primary-foreground: oklch(0.18 0.03 255);
+  --sidebar-accent: oklch(0.20 0.03 250);
+  --sidebar-accent-foreground: oklch(0.96 0.01 250);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.78 0.14 80);
+  
+  --shadow-elegant: 0 10px 40px -10px rgba(0, 0, 0, 0.6);
+  --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+}
+
+.dark .bg-card,
+.dark [class*="bg-card"],
+.dark .border,
+.dark [class*="border-"],
+.dark .rounded-xl {
+  backdrop-filter: blur(16px);
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
+}
+
+/* Radar pulsing effect for active GPS pins */
+@keyframes radar-pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.radar-pulse-ring {
+  animation: radar-pulse 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+}
+
+/* Print optimization for executive PDF reports */
+@media print {
+  aside,
+  header,
+  button,
+  .tabs-list,
+  [role="tablist"],
+  .no-print,
+  [data-sidebar="sidebar"],
+  button[data-sidebar="trigger"] {
+    display: none !important;
+  }
+  
+  body,
+  main,
+  .container {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  .print-card-break {
+    page-break-inside: avoid !important;
+  }
+  
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* Custom Leaflet Dark Mode Map Styling */
+.leaflet-container {
+  background-color: #0f172a !important;
+}
+
+.custom-leaflet-popup .leaflet-popup-content-wrapper {
+  background: rgba(15, 23, 42, 0.95) !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 10px !important;
+  backdrop-filter: blur(8px) !important;
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.7) !important;
+  padding: 0 !important;
+}
+
+.custom-leaflet-popup .leaflet-popup-content {
+  margin: 0 !important;
+}
+
+.custom-leaflet-popup .leaflet-popup-tip {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Make Leaflet pane markers not have ugly default outline */
+.custom-leaflet-pin {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Custom Leaflet Cluster Styling */
+.custom-leaflet-cluster-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
