@@ -13,6 +13,7 @@ import { Route as TractosRouteImport } from './routes/tractos'
 import { Route as ReportesRouteImport } from './routes/reportes'
 import { Route as RemolquesRouteImport } from './routes/remolques'
 import { Route as ProductividadRouteImport } from './routes/productividad'
+import { Route as DhoRouteImport } from './routes/dho'
 import { Route as ConfiguracionRouteImport } from './routes/configuracion'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -36,6 +37,11 @@ const ProductividadRoute = ProductividadRouteImport.update({
   path: '/productividad',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DhoRoute = DhoRouteImport.update({
+  id: '/dho',
+  path: '/dho',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ConfiguracionRoute = ConfiguracionRouteImport.update({
   id: '/configuracion',
   path: '/configuracion',
@@ -50,6 +56,7 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/configuracion': typeof ConfiguracionRoute
+  '/dho': typeof DhoRoute
   '/productividad': typeof ProductividadRoute
   '/remolques': typeof RemolquesRoute
   '/reportes': typeof ReportesRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/configuracion': typeof ConfiguracionRoute
+  '/dho': typeof DhoRoute
   '/productividad': typeof ProductividadRoute
   '/remolques': typeof RemolquesRoute
   '/reportes': typeof ReportesRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/configuracion': typeof ConfiguracionRoute
+  '/dho': typeof DhoRoute
   '/productividad': typeof ProductividadRoute
   '/remolques': typeof RemolquesRoute
   '/reportes': typeof ReportesRoute
@@ -77,6 +86,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/configuracion'
+    | '/dho'
     | '/productividad'
     | '/remolques'
     | '/reportes'
@@ -85,6 +95,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/configuracion'
+    | '/dho'
     | '/productividad'
     | '/remolques'
     | '/reportes'
@@ -93,6 +104,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/configuracion'
+    | '/dho'
     | '/productividad'
     | '/remolques'
     | '/reportes'
@@ -102,6 +114,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConfiguracionRoute: typeof ConfiguracionRoute
+  DhoRoute: typeof DhoRoute
   ProductividadRoute: typeof ProductividadRoute
   RemolquesRoute: typeof RemolquesRoute
   ReportesRoute: typeof ReportesRoute
@@ -138,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductividadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dho': {
+      id: '/dho'
+      path: '/dho'
+      fullPath: '/dho'
+      preLoaderRoute: typeof DhoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/configuracion': {
       id: '/configuracion'
       path: '/configuracion'
@@ -158,6 +178,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConfiguracionRoute: ConfiguracionRoute,
+  DhoRoute: DhoRoute,
   ProductividadRoute: ProductividadRoute,
   RemolquesRoute: RemolquesRoute,
   ReportesRoute: ReportesRoute,

@@ -40,6 +40,7 @@ type Direction = {
   icon: React.ComponentType<{ className?: string }>;
   items?: LeafItem[];
   comingSoon?: boolean;
+  url?: string;
 };
 
 const operacionItems: LeafItem[] = [
@@ -56,7 +57,7 @@ const direcciones: Direction[] = [
     items: operacionItems,
   },
   { title: "Administración", icon: Building2, comingSoon: true },
-  { title: "DHO", icon: Users, comingSoon: true },
+  { title: "DHO", url: "/dho", icon: Users },
 ];
 
 export function AppSidebar() {
@@ -110,7 +111,7 @@ export function AppSidebar() {
               </SidebarMenuItem>
 
               {direcciones.map((dir) => {
-                if (dir.comingSoon || !dir.items) {
+                if (dir.comingSoon) {
                   return (
                     <SidebarMenuItem key={dir.title}>
                       <SidebarMenuButton
@@ -126,6 +127,19 @@ export function AppSidebar() {
                             </span>
                           </span>
                         )}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                }
+
+                if (dir.url) {
+                  return (
+                    <SidebarMenuItem key={dir.title}>
+                      <SidebarMenuButton asChild isActive={isActive(dir.url)}>
+                        <Link to={dir.url} className="flex items-center gap-2">
+                          <dir.icon className="h-4 w-4" />
+                          {!collapsed && <span>{dir.title}</span>}
+                        </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
@@ -152,7 +166,7 @@ export function AppSidebar() {
                       {!collapsed && (
                         <CollapsibleContent>
                           <SidebarMenuSub>
-                            {dir.items.map((item) => (
+                            {dir.items?.map((item) => (
                               <SidebarMenuSubItem key={item.title}>
                                 <SidebarMenuSubButton
                                   asChild
