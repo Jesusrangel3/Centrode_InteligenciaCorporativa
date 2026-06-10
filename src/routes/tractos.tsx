@@ -389,25 +389,145 @@ function TractosPage() {
     });
   };
 
-  return (
-    <div className="container mx-auto px-4 py-6 max-w-[1400px] space-y-6">
-      {/* Title & Actions */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-primary">Tractocamiones</h1>
-          <p className="text-muted-foreground text-sm">Inventario centralizado y métricas telemáticas individuales de la flota de 280+ Tractocamiones.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleExportCSV}>
-            <Download className="h-4 w-4 mr-1.5" /> Exportar CSV
-          </Button>
-          <Button variant="gold" size="sm">
-            <Plus className="h-4 w-4 mr-1.5" /> Agregar Tractocamión
-          </Button>
-        </div>
-      </header>
+      // Alertas críticas de Tractos
+      const criticalTractosMaint = tractos
+        .filter((t) => t.estado === "Mantenimiento" || t.estado === "Inactivo")
+        .slice(0, 5);
 
-      <EstructuraTractos units={businessUnits} fleetTractos={tractos} />
+      const criticalTractosLowPerf = tractos
+        .filter((t) => t.estado === "Activo" && t.utilizacion < 80)
+        .sort((a, b) => a.utilizacion - b.utilizacion)
+        .slice(0, 5);
+
+      return (
+        <div className="container mx-auto px-4 py-6 max-w-[1400px] space-y-6">
+          {/* Title & Actions */}
+          <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-primary">Tractocamiones</h1>
+              <p className="text-muted-foreground text-sm">Inventario centralizado y métricas telemáticas individuales de la flota de 280+ Tractocamiones.</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                <Download className="h-4 w-4 mr-1.5" /> Exportar CSV
+              </Button>
+              <Button variant="gold" size="sm">
+                <Plus className="h-4 w-4 mr-1.5" /> Agregar Tractocamión
+              </Button>
+            </div>
+          </header>
+
+          <EstructuraTractos units={businessUnits} fleetTractos={tractos} />
+
+          {/* Alertas Críticas (Diagnóstico) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Card 1: Alertas Mecánicas */}
+            <div className="rounded-xl border bg-card/60 backdrop-blur-md p-5 shadow-[var(--shadow-card)] space-y-4">
+              <div className="flex items-center justify-between border-b pb-3 border-border/80">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-warning/10 text-warning">
+                    <Wrench className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Alertas Mecánicas e Inactividad</h3>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Unidades actualmente inactivas o en mantenimiento en taller ZAM</p>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-warning/10 text-warning border border-warning/20 px-2 py-0.5 rounded-full font-bold">
+                  {tractos.filter(t => t.estado === "Mantenimiento" || t.estado === "Inactivo").length} Críticas
+                </span>
+              </div>
+
+              <div className="divide-y divide-border/60">
+                {criticalTractosMaint.length > 0 ? (
+                  criticalTractosMaint.map((t) => (
+                    <div
+                      key={t.id}
+                      onClick={() => handleRowClick(t)}
+                      className="flex items-center justify-between py-2.5 hover:bg-muted/40 px-2 rounded-lg transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="font-black text-xs text-foreground bg-muted px-2 py-1 rounded border group-hover:border-primary/45 transition-colors">
+                          #{t.economico}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-foreground truncate">{t.conductor || "Sin Conductor Asignado"}</p>
+                          <p className="text-[9px] text-muted-foreground truncate">{t.unidadNegocio} | {t.modelo}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5">
+                        <div className="text-right">
+                          <p className="text-[10px] font-bold text-foreground">
+                            {t.costoManttoMensual > 0 ? `${formatUSD(t.costoManttoMensual)} USD` : "Sin costo"}
+                          </p>
+                          <p className="text-[8px] text-muted-foreground">Mantenimiento</p>
+                        </div>
+                        <StatusBadge estado={t.estado} />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-muted-foreground py-4 text-center">No hay unidades críticas registradas.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Card 2: Alertas de Baja Utilización */}
+            <div className="rounded-xl border bg-card/60 backdrop-blur-md p-5 shadow-[var(--shadow-card)] space-y-4">
+              <div className="flex items-center justify-between border-b pb-3 border-border/80">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-destructive/10 text-destructive">
+                    <Activity className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Alertas de Baja Utilización</h3>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Unidades activas operando por debajo de la meta del 80%</p>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-destructive/10 text-destructive border border-destructive/20 px-2 py-0.5 rounded-full font-bold">
+                  {tractos.filter(t => t.estado === "Activo" && t.utilizacion < 80).length} En Riesgo
+                </span>
+              </div>
+
+              <div className="divide-y divide-border/60">
+                {criticalTractosLowPerf.length > 0 ? (
+                  criticalTractosLowPerf.map((t) => (
+                    <div
+                      key={t.id}
+                      onClick={() => handleRowClick(t)}
+                      className="flex items-center justify-between py-2.5 hover:bg-muted/40 px-2 rounded-lg transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="font-black text-xs text-foreground bg-muted px-2 py-1 rounded border group-hover:border-primary/45 transition-colors">
+                          #{t.economico}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-foreground truncate">{t.conductor || "Sin Conductor Asignado"}</p>
+                          <p className="text-[9px] text-muted-foreground truncate">{t.unidadNegocio} | {t.modelo}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 shrink-0">
+                        <div className="w-24 space-y-1">
+                          <div className="flex items-center justify-between text-[9px] font-medium">
+                            <span className="text-muted-foreground">Utilización</span>
+                            <span className="text-destructive font-bold">{t.utilizacion}%</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                            <div className="h-full bg-destructive" style={{ width: `${t.utilizacion}%` }} />
+                          </div>
+                        </div>
+                        <span className="text-[9px] bg-destructive/10 text-destructive border border-destructive/20 px-1.5 py-0.5 rounded font-medium">
+                          {t.utilizacion}%
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-muted-foreground py-4 text-center">Todas las unidades activas cumplen la meta de utilización.</p>
+                )}
+              </div>
+            </div>
+          </div>
 
       {/* Filter Toolbar */}
       <section className="bg-card border rounded-xl p-4 shadow-[var(--shadow-card)] flex flex-wrap items-center gap-3">
