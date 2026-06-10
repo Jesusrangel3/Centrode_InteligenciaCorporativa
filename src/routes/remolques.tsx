@@ -147,6 +147,38 @@ function getRemolqueCapacityMetrics(r: Remolque) {
   };
 }
 
+function getRemolqueMaintenanceMetrics(r: Remolque) {
+  const seed = parseInt(r.economico.replace(/\D/g, "")) || 1;
+  const isMaintOrInactive = r.estado === "Mantenimiento" || r.estado === "Inactivo";
+  
+  const correctivoDays = Math.round(r.diasTaller * 0.7);
+  const preventivoDays = Math.round(r.diasTaller * 0.3) || 1;
+  
+  const correctivoCount = r.diasTaller > 8 ? 3 : r.diasTaller > 4 ? 2 : r.diasTaller > 0 ? 1 : 0;
+  const downtimeCost = correctivoDays * 150; // $150 USD loss per day for trailer
+  
+  const totalCost = r.costoKmMantto * r.kmRecorridos;
+  const correctivoCost = totalCost * 0.7;
+  const preventivoCost = totalCost * 0.3;
+
+  let riskLevel: "green" | "yellow" | "red" = "green";
+  if (r.diasTaller > 8 || correctivoCount >= 3) {
+    riskLevel = "red";
+  } else if (r.diasTaller > 4 || correctivoCount === 2) {
+    riskLevel = "yellow";
+  }
+
+  return {
+    preventivoDays,
+    correctivoDays,
+    correctivoCount,
+    downtimeCost,
+    correctivoCost,
+    preventivoCost,
+    riskLevel
+  };
+}
+
 function EstructuraRemolques({
   units,
   fleetRemolques,
@@ -927,30 +959,60 @@ function RemolquesPage() {
                 </div>
               </div>
 
-              {/* Maintenance comparison details */}
-              <div className="border rounded-xl p-4 space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Análisis de Estancia en Taller</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between border-b border-dashed pb-1">
-                    <span className="text-muted-foreground">Porcentaje Inactividad Taller:</span>
-                    <span className="font-semibold tabular-nums">
-                      {((selectedRemolque.diasTaller / 30) * 100).toFixed(1)}%
-                    </span>
+              {/* Impacto de Mantenimiento Section */}
+              {(() => {
+                const maint = getRemolqueMaintenanceMetrics(selectedRemolque);
+                return (
+                  <div className="border rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Impacto de Mantenimiento en Ingresos</h3>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-muted-foreground">Reincidencia:</span>
+                        <span className={cn(
+                          "h-2 w-2 rounded-full",
+                          maint.riskLevel === "green" ? "bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.6)]" :
+                          maint.riskLevel === "yellow" ? "bg-amber-500" : "bg-rose-500 shadow-[0_0_4px_rgba(244,63,94,0.6)] animate-pulse"
+                        )} />
+                        <span className="text-[10px] font-bold uppercase">
+                          {maint.riskLevel === "green" ? "Bajo" : maint.riskLevel === "yellow" ? "Medio" : "Crítico"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2.5 text-sm">
+                      <div className="flex justify-between border-b border-dashed pb-1">
+                        <span className="text-muted-foreground">Mantenimiento Preventivo:</span>
+                        <span className="font-semibold text-emerald-500">{maint.preventivoDays} días ({formatUSD(maint.preventivoCost)})</span>
+                      </div>
+                      <div className="flex justify-between border-b border-dashed pb-1">
+                        <span className="text-muted-foreground">Mantenimiento Correctivo:</span>
+                        <span className="font-semibold text-rose-500">{maint.correctivoDays} días ({formatUSD(maint.correctivoCost)})</span>
+                      </div>
+                      <div className="flex justify-between border-b border-dashed pb-1">
+                        <span className="text-muted-foreground">Porcentaje Inactividad Taller:</span>
+                        <span className="font-semibold tabular-nums">{((selectedRemolque.diasTaller / 30) * 100).toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between border-b border-dashed pb-1">
+                        <span className="text-muted-foreground">Disponibilidad Mecánica:</span>
+                        <span className="font-semibold text-success tabular-nums">{(100 - (selectedRemolque.diasTaller / 30) * 100).toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between pt-1.5 font-bold text-destructive">
+                        <span>Pérdida por Inactividad (Downtime):</span>
+                        <span className="tabular-nums">{formatUSD(maint.downtimeCost)} USD</span>
+                      </div>
+
+                      {maint.riskLevel === "red" && (
+                        <div className="bg-destructive/10 border border-destructive/20 text-destructive text-[11px] rounded-lg p-3 mt-2 space-y-1">
+                          <p className="font-bold flex items-center gap-1">⚠️ ALERTA DE RENOVACIÓN DE ACTIVO</p>
+                          <p className="text-[10px] leading-relaxed text-muted-foreground/90">
+                            La inactividad prolongada ({selectedRemolque.diasTaller} días) y pérdidas por downtime ({formatUSD(maint.downtimeCost)} USD) sugieren obsolescencia de remolque. Se recomienda evaluar reemplazo por Leasing para mantener disponibilidad de fletes Bachoco / Refinados.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex justify-between border-b border-dashed pb-1">
-                    <span className="text-muted-foreground">Disponibilidad Mecánica:</span>
-                    <span className="font-semibold text-success tabular-nums">
-                      {(100 - (selectedRemolque.diasTaller / 30) * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between pt-1 font-bold text-primary text-sm">
-                    <span>Costo total estimado mantenimiento:</span>
-                    <span className="font-bold tabular-nums">
-                      {formatUSD(selectedRemolque.costoKmMantto * selectedRemolque.kmRecorridos)}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Recharts chart for utilization */}
               <div className="space-y-4">

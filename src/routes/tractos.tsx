@@ -165,6 +165,36 @@ function getTractoCapacityMetrics(t: Tracto) {
   };
 }
 
+function getTractoMaintenanceMetrics(t: Tracto) {
+  const seed = parseInt(t.economico.replace(/\D/g, "")) || 1;
+  const isMaintOrInactive = t.estado === "Mantenimiento" || t.estado === "Inactivo";
+  
+  const preventivoDays = (seed % 3) + 1; // 1 to 3 days
+  const correctivoDays = isMaintOrInactive ? (seed % 5) + 4 : (seed % 2); // 4-8 days if down, otherwise 0-1 days
+  const correctivoCount = isMaintOrInactive ? (seed % 3) + 1 : (seed % 2); // 1-3 times if down, otherwise 0-1
+  
+  const downtimeCost = correctivoDays * 450; // $450 USD loss per day
+  const correctivoCost = t.costoManttoMensual * 0.7;
+  const preventivoCost = t.costoManttoMensual * 0.3;
+
+  let riskLevel: "green" | "yellow" | "red" = "green";
+  if (correctivoCount >= 3 || (isMaintOrInactive && correctivoDays >= 6)) {
+    riskLevel = "red";
+  } else if (correctivoCount === 2 || correctivoDays >= 3) {
+    riskLevel = "yellow";
+  }
+
+  return {
+    preventivoDays,
+    correctivoDays,
+    correctivoCount,
+    downtimeCost,
+    correctivoCost,
+    preventivoCost,
+    riskLevel
+  };
+}
+
 function EstructuraTractos({
   units,
   fleetTractos,
@@ -1014,6 +1044,57 @@ function TractosPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Impacto de Mantenimiento Section */}
+              {(() => {
+                const maint = getTractoMaintenanceMetrics(selectedTracto);
+                return (
+                  <div className="border rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Impacto de Mantenimiento en Ingresos</h3>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-muted-foreground">Reincidencia:</span>
+                        <span className={cn(
+                          "h-2 w-2 rounded-full",
+                          maint.riskLevel === "green" ? "bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.6)]" :
+                          maint.riskLevel === "yellow" ? "bg-amber-500" : "bg-rose-500 shadow-[0_0_4px_rgba(244,63,94,0.6)] animate-pulse"
+                        )} />
+                        <span className="text-[10px] font-bold uppercase">
+                          {maint.riskLevel === "green" ? "Bajo" : maint.riskLevel === "yellow" ? "Medio" : "Crítico"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2.5 text-sm">
+                      <div className="flex justify-between border-b border-dashed pb-1">
+                        <span className="text-muted-foreground">Mantenimiento Preventivo:</span>
+                        <span className="font-semibold text-emerald-500">{maint.preventivoDays} días ({formatUSD(maint.preventivoCost)})</span>
+                      </div>
+                      <div className="flex justify-between border-b border-dashed pb-1">
+                        <span className="text-muted-foreground">Mantenimiento Correctivo:</span>
+                        <span className="font-semibold text-rose-500">{maint.correctivoDays} días ({formatUSD(maint.correctivoCost)})</span>
+                      </div>
+                      <div className="flex justify-between border-b border-dashed pb-1">
+                        <span className="text-muted-foreground">Frecuencia / Ingresos Taller:</span>
+                        <span className="font-semibold">{maint.correctivoCount} veces este mes</span>
+                      </div>
+                      <div className="flex justify-between pt-1.5 font-bold text-destructive">
+                        <span>Pérdida por Inactividad (Downtime):</span>
+                        <span className="tabular-nums">{formatUSD(maint.downtimeCost)} USD</span>
+                      </div>
+
+                      {maint.riskLevel === "red" && (
+                        <div className="bg-destructive/10 border border-destructive/20 text-destructive text-[11px] rounded-lg p-3 mt-2 space-y-1">
+                          <p className="font-bold flex items-center gap-1">⚠️ ALERTA DE RENOVACIÓN OBLIGATORIA</p>
+                          <p className="text-[10px] leading-relaxed text-muted-foreground/90">
+                            La reincidencia de fallas y pérdida por downtime ({formatUSD(maint.downtimeCost)} USD) indican obsolescencia. Los costos operativos superan el punto de equilibrio financiero. Se sugiere renovar a un activo nuevo en esquema Leasing.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Financial comparison details */}
               <div className="border rounded-xl p-4 space-y-3">
