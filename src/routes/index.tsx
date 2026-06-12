@@ -21,6 +21,9 @@ import {
   CheckCircle,
   AlertTriangle,
   ArrowRight,
+  TrendingDown,
+  Fuel,
+  ShieldAlert,
   Globe,
   Award,
 } from "lucide-react";
@@ -49,7 +52,7 @@ import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -169,6 +172,7 @@ function Dashboard() {
   const [monthFilter, setMonthFilter] = useState<string>("Junio");
   const [biTab, setBiTab] = useState<"consolidada" | "tractos" | "remolques">("consolidada");
   const [activeKpi, setActiveKpi] = useState<"equipoAsignado" | "utilizacion" | "kmCargados" | "renovacion" | "capacidad">("equipoAsignado");
+  const [activeFunnelStep, setActiveFunnelStep] = useState<"ingreso" | "venta" | "prod" | "costo" | "utilidad">("ingreso");
   const [mapSearch, setMapSearch] = useState<string>("");
   const [leafletLoaded, setLeafletLoaded] = useState<boolean>(false);
   const [mapFilterMode, setMapFilterMode] = useState<"todos" | "movimiento" | "detenidos">("todos");
@@ -276,9 +280,10 @@ function Dashboard() {
   };
 
   // Tab 2: Simulation States
-  const [simUtil, setSimUtil] = useState<number>(82); // Initial avgUtil
-  const [simRate, setSimRate] = useState<number>(2.46); // Initial avg sale/km
-  const [simMaintReduction, setSimMaintReduction] = useState<number>(10); // Initial 10% saving
+  const [simDieselOpt, setSimDieselOpt] = useState<number>(0); // 0% to 15% optimization
+  const [simCostReduction, setSimCostReduction] = useState<number>(0); // 0 to 5 MXN/km reduction
+  const [simSafetyImprovement, setSimSafetyImprovement] = useState<number>(0); // 0% to 50% safety enhancement
+  const [simDowntimeReduction, setSimDowntimeReduction] = useState<number>(0); // 0% to 30% downtime saving
 
   // Tab 2: Live telemetry state
   const [logs, setLogs] = useState<string[]>([]);
@@ -407,16 +412,7 @@ function Dashboard() {
       setBusinessUnits(getBusinessUnits());
       setSystemConfig(getSystemConfig());
 
-      // Update simulation base values
-      const baseUtil = liveTractos.length
-        ? Math.round(liveTractos.reduce((a, b) => a + b.utilizacion, 0) / liveTractos.length)
-        : 82;
-      const baseTotalKm = liveTractos.reduce((a, b) => a + (b.kmRecorridos || 0), 0);
-      const baseRevenue = liveTractos.reduce((a, b) => a + (b.ventaPorKm || 0) * (b.kmRecorridos || 0), 0);
-      const baseRate = baseTotalKm ? baseRevenue / baseTotalKm : 2.46;
-
-      setSimUtil(baseUtil);
-      setSimRate(parseFloat(baseRate.toFixed(2)));
+      // Base values updated
     };
 
     window.addEventListener("fleet-data-updated", handleUpdate);
@@ -693,18 +689,32 @@ function Dashboard() {
   const utilPerUnit = filteredTractos.length ? Math.round(totalUtility / filteredTractos.length) : 0;
   const costPerKm = totalKm ? totalDirectCosts / totalKm : 0;
   const avgRendimiento = activeTractos.length ? (activeTractos.reduce((a, b) => a + b.rendimiento, 0) / activeTractos.length).toFixed(2) : "0";
-  const roa = (totalUtility * 12) / Math.max(1, filteredTractos.length * 120000) * 100;
-  const avgSafetyScore = activeTractos.length ? activeTractos.reduce((a, b) => a + b.scoreSeguridad, 0) / activeTractos.length : 0;
+  const roa = filteredTractos.length ? ((totalUtility * 12) / (filteredTractos.length * 3000000)) * 100 : 0;
+  const avgSafetyScore = activeTractos.length ? activeTractos.reduce((a, b) => a + b.scoreSeguridad, 0) / activeTractos.length : 0; // Tasa de frenadas por km (e.g. 0.0015)
   const maintCostPerKm = totalKm ? totalMaintCost / totalKm : 0;
-  const unitsToRenew = filteredTractos.filter((t) => t.costoManttoMensual + t.combustibleExcedenteCosto > 1500).length;
+  const unitsToRenew = filteredTractos.filter((t) => t.costoManttoMensual + t.combustibleExcedenteCosto > 30000).length;
 
   // SIMULATOR FORMULAS (EBITDA Projection)
-  const simulatedRevenue = totalKm * simRate * (simUtil / Math.max(1, avgUtil));
-  const simulatedMaintCost = totalMaintCost * (1 - simMaintReduction / 100);
-  const simulatedDirectCosts = totalDirectCosts - totalMaintCost + simulatedMaintCost;
-  const simulatedUtility = simulatedRevenue - simulatedDirectCosts;
-  const simulatedEbitdaDelta = simulatedUtility - totalUtility;
+  // Diesel optimization saves roughly 30% of direct costs (fuel is ~30% of operating cost)
+  const dieselSavings = totalDirectCosts * 0.30 * (simDieselOpt / 100);
+  const costPerKmSavings = totalKm * simCostReduction;
+  const simulatedEbitdaDelta = dieselSavings + costPerKmSavings;
+  const simulatedUtility = totalUtility + simulatedEbitdaDelta;
+  const simulatedRevenue = totalRevenue; // Revenue stays constant in cost optimization scenarios
   const simulatedMargin = simulatedRevenue ? (simulatedUtility / simulatedRevenue) * 100 : 0;
+
+  // BI FLEET HUB CALCULATIONS
+  const maintTractosCount = filteredTractos.filter(t => t.estado === "Mantenimiento").length;
+  const maintRemolquesCount = filteredRemolques.filter(r => r.estado === "Mantenimiento").length;
+  const dailyLoss = (maintTractosCount * 9000) + (maintRemolquesCount * 3000);
+  const monthlyLoss = dailyLoss * 30;
+
+  // Alternative 2 Simulator calculations:
+  // Safety improvement reduces maintenance costs (tires, brakes, suspensions) by up to 25% of total maint cost
+  const safetyMaintSavings = totalMaintCost * 0.25 * (simSafetyImprovement / 50);
+  // Downtime reduction saves daily loss cost
+  const downtimeMaintSavings = monthlyLoss * (simDowntimeReduction / 30);
+  const totalMaintSavingsProyected = safetyMaintSavings + downtimeMaintSavings;
 
   // Scatter plot data mapping (x: cost/km, y: sale/km, z: economic)
   const scatterData = filteredTractos
@@ -716,12 +726,6 @@ function Dashboard() {
       utilidad: t.utilidadReal,
       bu: t.unidadNegocio,
     }));
-
-  // BI FLEET HUB CALCULATIONS
-  const maintTractosCount = filteredTractos.filter(t => t.estado === "Mantenimiento").length;
-  const maintRemolquesCount = filteredRemolques.filter(r => r.estado === "Mantenimiento").length;
-  const dailyLoss = (maintTractosCount * 450) + (maintRemolquesCount * 150);
-  const monthlyLoss = dailyLoss * 30;
 
   const biChartData = businessUnits
     .filter(bu => bu.active)
@@ -1037,6 +1041,260 @@ function Dashboard() {
             </div>
           </section>
 
+          {/* Consola Interactiva de BI: KPIs de Productividad */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 border-b pb-2">
+              <div className="h-4 w-1 bg-primary rounded-full" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-primary">📊 Consola Interactiva de BI: KPIs de Productividad</h3>
+            </div>
+            
+            <div className="grid gap-6 lg:grid-cols-4">
+              {/* Left Selectors Panel (1 column) */}
+              <div className="flex flex-col gap-3 lg:col-span-1">
+                {/* Selector 1: Equipo Asignado */}
+                <button
+                  onClick={() => setActiveKpi("equipoAsignado")}
+                  className={cn(
+                    "group text-left p-4 rounded-xl border transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[110px] backdrop-blur-md shadow-sm",
+                    activeKpi === "equipoAsignado"
+                      ? "bg-gradient-to-br from-primary/25 to-primary/5 border-primary shadow-[0_0_12px_rgba(59,130,246,0.2)] font-semibold"
+                      : "bg-card/55 border-border/30 hover:border-border/60"
+                  )}
+                >
+                  <div className="flex justify-between items-start w-full">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Equipo Asignado</span>
+                    <span className="h-2 w-2 rounded-full bg-success" />
+                  </div>
+                  <div className="mt-2 flex items-baseline justify-between w-full">
+                    <p className="text-2xl font-black font-display text-foreground">{filteredTractos.length} <span className="text-xs text-muted-foreground font-normal">uds.</span></p>
+                    <span className="text-[10px] text-success font-semibold flex items-center">▲ 100%</span>
+                  </div>
+                  <div className="mt-1 flex flex-col text-[7.5px] text-muted-foreground/80 leading-tight">
+                    <span className="font-bold text-primary-glow">Fórmula: Tractocamiones por BU</span>
+                    <span>Meta: Distribución Óptima | Software: Samsara</span>
+                  </div>
+                </button>
+
+                {/* Selector 2: Utilizacion */}
+                <button
+                  onClick={() => setActiveKpi("utilizacion")}
+                  className={cn(
+                    "group text-left p-4 rounded-xl border transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[110px] backdrop-blur-md shadow-sm",
+                    activeKpi === "utilizacion"
+                      ? "bg-gradient-to-br from-primary/25 to-primary/5 border-primary shadow-[0_0_12px_rgba(59,130,246,0.2)] font-semibold"
+                      : "bg-card/55 border-border/30 hover:border-border/60"
+                  )}
+                >
+                  <div className="flex justify-between items-start w-full">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Utilización Unidad</span>
+                    <span className={cn(
+                      "h-2 w-2 rounded-full",
+                      avgUtil >= 80 ? "bg-success" : avgUtil >= 70 ? "bg-warning" : "bg-destructive"
+                    )} />
+                  </div>
+                  <div className="mt-2 flex items-baseline justify-between w-full">
+                    <p className="text-2xl font-black font-display text-foreground">{avgUtil}%</p>
+                    <span className="text-[10px] text-success font-semibold flex items-center">▲ 4%</span>
+                  </div>
+                  <div className="mt-1 flex flex-col text-[7.5px] text-muted-foreground/80 leading-tight">
+                    <span className="font-bold text-primary-glow">Fórmula: (Horas Prod / Horas Disp) × 100</span>
+                    <span>Meta: 80% | Software: Samsara + ZAM</span>
+                  </div>
+                </button>
+
+                {/* Selector 3: Km Cargados */}
+                <button
+                  onClick={() => setActiveKpi("kmCargados")}
+                  className={cn(
+                    "group text-left p-4 rounded-xl border transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[110px] backdrop-blur-md shadow-sm",
+                    activeKpi === "kmCargados"
+                      ? "bg-gradient-to-br from-primary/25 to-primary/5 border-primary shadow-[0_0_12px_rgba(59,130,246,0.2)] font-semibold"
+                      : "bg-card/55 border-border/30 hover:border-border/60"
+                  )}
+                >
+                  <div className="flex justify-between items-start w-full">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">% Km Cargados</span>
+                    <span className={cn(
+                      "h-2 w-2 rounded-full",
+                      avgKmCargados >= 60 ? "bg-success" : avgKmCargados >= 50 ? "bg-warning" : "bg-destructive"
+                    )} />
+                  </div>
+                  <div className="mt-2 flex items-baseline justify-between w-full">
+                    <p className="text-2xl font-black font-display text-foreground">{avgKmCargados}%</p>
+                    <span className="text-[10px] text-success font-semibold flex items-center">▲ 2%</span>
+                  </div>
+                  <div className="mt-1 flex flex-col text-[7.5px] text-muted-foreground/80 leading-tight">
+                    <span className="font-bold text-primary-glow">Fórmula: (Km Cargados / Km Totales) × 100</span>
+                    <span>Meta: &gt;50% | Software: Samsara</span>
+                  </div>
+                </button>
+
+                {/* Selector 4: Renovacion */}
+                <button
+                  onClick={() => setActiveKpi("renovacion")}
+                  className={cn(
+                    "group text-left p-4 rounded-xl border transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[110px] backdrop-blur-md shadow-sm",
+                    activeKpi === "renovacion"
+                      ? "bg-gradient-to-br from-primary/25 to-primary/5 border-primary shadow-[0_0_12px_rgba(59,130,246,0.2)] font-semibold"
+                      : "bg-card/55 border-border/30 hover:border-border/60"
+                  )}
+                >
+                  <div className="flex justify-between items-start w-full">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Equilibrio Renovación</span>
+                    <span className={cn(
+                      "h-2 w-2 rounded-full",
+                      unitsToRenew === 0 ? "bg-success" : unitsToRenew <= 2 ? "bg-warning" : "bg-destructive"
+                    )} />
+                  </div>
+                  <div className="mt-2 flex items-baseline justify-between w-full">
+                    <p className="text-2xl font-black font-display text-foreground">{unitsToRenew} uds.</p>
+                    <span className="text-[10px] text-destructive font-semibold flex items-center">▼ 1%</span>
+                  </div>
+                  <div className="mt-1 flex flex-col text-[7.5px] text-muted-foreground/80 leading-tight">
+                    <span className="font-bold text-primary-glow">Fórmula: (Costo Mtto + Comb. Exc.) vs Arrendamiento</span>
+                    <span>Meta: 0 críticas | Software: ZAM + Samsara</span>
+                  </div>
+                </button>
+
+                {/* Selector 5: Capacidad */}
+                <button
+                  onClick={() => setActiveKpi("capacidad")}
+                  className={cn(
+                    "group text-left p-4 rounded-xl border transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[110px] backdrop-blur-md shadow-sm",
+                    activeKpi === "capacidad"
+                      ? "bg-gradient-to-br from-primary/25 to-primary/5 border-primary shadow-[0_0_12px_rgba(59,130,246,0.2)] font-semibold"
+                      : "bg-card/55 border-border/30 hover:border-border/60"
+                  )}
+                >
+                  <div className="flex justify-between items-start w-full">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Capacidad Instalada</span>
+                    <span className="h-2 w-2 rounded-full bg-success" />
+                  </div>
+                  <div className="mt-2 flex items-baseline justify-between w-full">
+                    <p className="text-2xl font-black font-display text-foreground">{capInst}</p>
+                    <span className="text-[10px] text-success font-semibold flex items-center">▲ 5%</span>
+                  </div>
+                  <div className="mt-1 flex flex-col text-[7.5px] text-muted-foreground/80 leading-tight">
+                    <span className="font-bold text-primary-glow">Fórmula: Viajes / Unidad</span>
+                    <span>Meta: Frecuencia Mensual | Software: ZAM</span>
+                  </div>
+                </button>
+              </div>
+
+              {/* Main Visual Display (2 columns) */}
+              <Card className="lg:col-span-2 shadow-[var(--shadow-card)] bg-card/65 backdrop-blur-lg border border-border/30 relative overflow-hidden flex flex-col justify-between h-[590px]">
+                <div className="absolute top-0 right-0 h-40 w-40 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-bold uppercase tracking-wider text-primary">
+                    Desglose Comparativo por Unidad de Negocio
+                  </CardTitle>
+                  <CardDescription className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 leading-relaxed">
+                    <span>
+                      Visualización de {activeKpi === "equipoAsignado" ? "Distribución de Flota" : activeKpi === "utilizacion" ? "Porcentaje de Utilización" : activeKpi === "kmCargados" ? "Eficiencia de Km" : activeKpi === "renovacion" ? "Unidades Excedidas en Renovación" : "Rotación de Viajes Mensuales"}
+                    </span>
+                    <span className="text-[9px] bg-muted/90 px-2 py-0.5 rounded border border-border/30 font-mono font-bold text-primary shrink-0">
+                      {activeKpi === "equipoAsignado" && "Fórmula: Conteo de Tractocamiones por BU"}
+                      {activeKpi === "utilizacion" && "Fórmula: (Horas Productivas / Horas Disponibles) × 100"}
+                      {activeKpi === "kmCargados" && "Fórmula: (Km Cargados / Km Totales) × 100"}
+                      {activeKpi === "renovacion" && "Fórmula: (Costo Mtto Mensual + Costo Combustible Excedente) vs Arrendamiento"}
+                      {activeKpi === "capacidad" && "Fórmula: Viajes / Unidad"}
+                    </span>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 min-h-0 pt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    {activeKpi === "equipoAsignado" ? (
+                      <BarChart data={buPerformanceData} margin={{ top: 10, right: 10, left: 25, bottom: 30 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" strokeOpacity={0.05} />
+                        <XAxis dataKey="shortName" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8 }} angle={-25} textAnchor="end" interval={0} height={60} />
+                        <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }} />
+                        <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '11px' }} />
+                        <Bar dataKey="totalTractos" name="Tractos Asignados" fill="#8B5CF6" radius={[4, 4, 0, 0]} maxBarSize={24} />
+                      </BarChart>
+                    ) : activeKpi === "utilizacion" ? (
+                      <BarChart data={buPerformanceData} margin={{ top: 10, right: 10, left: 25, bottom: 30 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" strokeOpacity={0.05} />
+                        <XAxis dataKey="shortName" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8 }} angle={-25} textAnchor="end" interval={0} height={60} />
+                        <YAxis domain={[0, 100]} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }} />
+                        <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '11px' }} />
+                        <Bar dataKey="utilizacion" name="Utilización (%)" fill="#3B82F6" radius={[4, 4, 0, 0]} maxBarSize={24}>
+                          {buPerformanceData.map((entry: any, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.utilizacion >= 80 ? "#10B981" : entry.utilizacion >= 70 ? "#F59E0B" : "#EF4444"} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    ) : activeKpi === "kmCargados" ? (
+                      <BarChart data={buPerformanceData} margin={{ top: 10, right: 10, left: 25, bottom: 30 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" strokeOpacity={0.05} />
+                        <XAxis dataKey="shortName" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8 }} angle={-25} textAnchor="end" interval={0} height={60} />
+                        <YAxis domain={[0, 100]} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }} />
+                        <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '11px' }} />
+                        <Legend wrapperStyle={{ fontSize: '9px', marginTop: '-10px' }} />
+                        <Bar dataKey="kmCargados" name="Km Cargados (%)" stackId="a" fill="#10B981" maxBarSize={24} />
+                        <Bar dataKey="kmVacios" name="Km Vacíos (%)" stackId="a" fill="#EF4444" radius={[4, 4, 0, 0]} maxBarSize={24} />
+                      </BarChart>
+                    ) : activeKpi === "renovacion" ? (
+                      <BarChart data={buPerformanceData} layout="vertical" margin={{ top: 10, right: 10, left: 15, bottom: 10 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" strokeOpacity={0.05} />
+                        <XAxis type="number" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }} />
+                        <YAxis dataKey="shortName" type="category" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8 }} width={90} />
+                        <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '11px' }} />
+                        <Bar dataKey="renovacion" name="Unidades Críticas" fill="#EF4444" radius={[0, 4, 4, 0]} maxBarSize={24} />
+                      </BarChart>
+                    ) : (
+                      <AreaChart data={buPerformanceData} margin={{ top: 10, right: 10, left: 25, bottom: 30 }}>
+                        <defs>
+                          <linearGradient id="colorCapacidad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" strokeOpacity={0.05} />
+                        <XAxis dataKey="shortName" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8 }} angle={-25} textAnchor="end" interval={0} height={60} />
+                        <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }} />
+                        <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '11px' }} />
+                        <Area type="monotone" dataKey="capacidad" name="Viajes/Ud" stroke="#8B5CF6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorCapacidad)" />
+                      </AreaChart>
+                    )}
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Right Diagnostic Panel (1 column) */}
+              <Card className="lg:col-span-1 shadow-[var(--shadow-card)] bg-card/65 backdrop-blur-lg border border-border/30 relative overflow-hidden flex flex-col justify-between h-[590px]">
+                <div className="absolute top-0 right-0 h-32 w-32 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4 text-gold" /> Diagnóstico BI
+                  </CardTitle>
+                  <CardDescription>Análisis operativo calculado en base a la telemetría viva.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 flex-1 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    {/* Top Performer */}
+                    <div className="p-3 border rounded-xl bg-success/5 border-success/20">
+                      <span className="text-[9px] uppercase font-bold text-success/80 tracking-wider block">{diag?.topLabel}</span>
+                      <span className="text-xs font-bold text-foreground mt-0.5 block">{diag?.topName}</span>
+                      <span className="text-lg font-black text-success mt-1 block">{diag?.topVal}</span>
+                    </div>
+
+                    {/* Worst Performer */}
+                    <div className="p-3 border rounded-xl bg-destructive/5 border-destructive/20">
+                      <span className="text-[9px] uppercase font-bold text-destructive/80 tracking-wider block">{diag?.bottomLabel}</span>
+                      <span className="text-xs font-bold text-foreground mt-0.5 block">{diag?.bottomName}</span>
+                      <span className="text-lg font-black text-destructive mt-1 block">{diag?.bottomVal}</span>
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] leading-relaxed text-muted-foreground bg-muted/30 p-3 rounded-lg border border-border/10">
+                    <span className="font-semibold text-primary block mb-1">💡 Análisis de Consola:</span>
+                    {diag?.insight}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
           {/* BI FLEET HUB SUITE */}
           <section className="space-y-4">
             <div className="flex items-center gap-2 border-b pb-2">
@@ -1287,7 +1545,7 @@ function Dashboard() {
                     </div>
 
                     <div className="text-[9px] text-muted-foreground leading-normal bg-warning/10 p-2.5 rounded border border-warning/25">
-                      💡 <span className="font-semibold text-warning-foreground">Fórmula:</span> Tracto $450 USD/día + Remolque $150 USD/día. Optimizar el tiempo de taller aumenta directamente el margen de utilidad.
+                      💡 <span className="font-semibold text-warning-foreground">Fórmula:</span> Tracto $9,000 MXN/día + Remolque $3,000 MXN/día. Optimizar el tiempo de taller aumenta directamente el margen de utilidad.
                     </div>
                   </CardContent>
                 </Card>
@@ -1349,364 +1607,385 @@ function Dashboard() {
               </CardContent>
             </Card>
           </div>
-
-          {/* Core 3 Categories of Cards */}
-          <div className="space-y-6">
-            <div className="space-y-3">
+            {/* Premium Interactive Financial BI Suite */}
+            <div className="space-y-4">
               <div className="flex items-center gap-2 border-b pb-2">
                 <div className="h-4 w-1 bg-primary rounded-full" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-primary">📊 Consola Interactiva de BI: KPIs de Productividad</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-primary">📊 CONSOLA EJECUTIVA DE RENTABILIDAD & FUGAS EBITDA (M.I.O.F.)</h3>
               </div>
-              
+
               <div className="grid gap-6 lg:grid-cols-4">
-                {/* Left Selectors Panel (1 column) */}
-                <div className="flex flex-col gap-3 lg:col-span-1">
-                  {/* Selector 1: Equipo Asignado */}
-                  <button
-                    onClick={() => setActiveKpi("equipoAsignado")}
-                    className={cn(
-                      "group text-left p-4 rounded-xl border transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[110px] backdrop-blur-md shadow-sm",
-                      activeKpi === "equipoAsignado"
-                        ? "bg-gradient-to-br from-primary/25 to-primary/5 border-primary shadow-[0_0_12px_rgba(59,130,246,0.2)] font-semibold"
-                        : "bg-card/55 border-border/30 hover:border-border/60"
-                    )}
-                  >
-                    <div className="flex justify-between items-start w-full">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Equipo Asignado</span>
-                      <span className="h-2 w-2 rounded-full bg-success" />
+                {/* Module 1: The Performance Radial Dials */}
+                <Card className="lg:col-span-1 shadow-[var(--shadow-card)] bg-card/65 backdrop-blur-lg border border-border/30 relative overflow-hidden flex flex-col justify-between p-4 h-[590px]">
+                  <div className="absolute top-0 right-0 h-32 w-32 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
+                  <CardHeader className="p-0 pb-3">
+                    <CardTitle className="text-xs font-black uppercase tracking-wider text-muted-foreground">Velocímetros Operativos</CardTitle>
+                    <CardDescription className="text-[10px]">Indicadores clave de retorno e inversión de activos.</CardDescription>
+                  </CardHeader>
+                  
+                  <CardContent className="p-0 flex-1 flex flex-col justify-around gap-4">
+                    {/* Dial 1: ROA Operativo */}
+                    <div className="flex flex-col items-center">
+                      <div className="relative h-24 w-24">
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                          <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.05)" strokeWidth="8" fill="transparent" />
+                          <circle cx="50" cy="50" r="40" stroke={roa >= 8 ? "#10B981" : roa >= 4 ? "#F59E0B" : "#EF4444"} strokeWidth="8" fill="transparent"
+                            strokeDasharray={251.2}
+                            strokeDashoffset={251.2 - (251.2 * Math.min(100, (roa / 15) * 100)) / 100}
+                            className="transition-all duration-1000"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-sm font-black text-foreground">{roa.toFixed(1)}%</span>
+                          <span className="text-[8px] text-muted-foreground font-bold">ROA</span>
+                        </div>
+                      </div>
+                      <span className="text-[9px] text-muted-foreground mt-1 text-center font-semibold">Meta: &gt;8% | Activo: $3M MXN</span>
                     </div>
-                    <div className="mt-2 flex items-baseline justify-between w-full">
-                      <p className="text-2xl font-black font-display text-foreground">{filteredTractos.length} <span className="text-xs text-muted-foreground font-normal">uds.</span></p>
-                      <span className="text-[10px] text-success font-semibold flex items-center">▲ 100%</span>
-                    </div>
-                    <div className="mt-1 flex flex-col text-[7.5px] text-muted-foreground/80 leading-tight">
-                      <span className="font-bold text-primary-glow">Fórmula: Tractocamiones por BU</span>
-                      <span>Meta: Distribución Óptima | Software: Samsara</span>
-                    </div>
-                  </button>
 
-                  {/* Selector 2: Utilizacion */}
-                  <button
-                    onClick={() => setActiveKpi("utilizacion")}
-                    className={cn(
-                      "group text-left p-4 rounded-xl border transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[110px] backdrop-blur-md shadow-sm",
-                      activeKpi === "utilizacion"
-                        ? "bg-gradient-to-br from-primary/25 to-primary/5 border-primary shadow-[0_0_12px_rgba(59,130,246,0.2)] font-semibold"
-                        : "bg-card/55 border-border/30 hover:border-border/60"
-                    )}
-                  >
-                    <div className="flex justify-between items-start w-full">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Utilización Unidad</span>
-                      <span className={cn(
-                        "h-2 w-2 rounded-full",
-                        avgUtil >= 80 ? "bg-success" : avgUtil >= 70 ? "bg-warning" : "bg-destructive"
-                      )} />
+                    {/* Dial 2: Rendimiento */}
+                    <div className="flex flex-col items-center">
+                      <div className="relative h-24 w-24">
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                          <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.05)" strokeWidth="8" fill="transparent" />
+                          <circle cx="50" cy="50" r="40" stroke={parseFloat(avgRendimiento) >= 2.4 ? "#10B981" : parseFloat(avgRendimiento) >= 2.1 ? "#F59E0B" : "#EF4444"} strokeWidth="8" fill="transparent"
+                            strokeDasharray={251.2}
+                            strokeDashoffset={251.2 - (251.2 * Math.min(100, (parseFloat(avgRendimiento) / 3.0) * 100)) / 100}
+                            className="transition-all duration-1000"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-xs font-black text-foreground">{avgRendimiento}</span>
+                          <span className="text-[7.5px] text-muted-foreground font-bold">KM/L</span>
+                        </div>
+                      </div>
+                      <span className="text-[9px] text-muted-foreground mt-1 text-center font-semibold">Meta: &gt;2.4 km/L (Diésel)</span>
                     </div>
-                    <div className="mt-2 flex items-baseline justify-between w-full">
-                      <p className="text-2xl font-black font-display text-foreground">{avgUtil}%</p>
-                      <span className="text-[10px] text-success font-semibold flex items-center">▲ 4%</span>
-                    </div>
-                    <div className="mt-1 flex flex-col text-[7.5px] text-muted-foreground/80 leading-tight">
-                      <span className="font-bold text-primary-glow">Fórmula: (Horas Prod / Horas Disp) × 100</span>
-                      <span>Meta: 80% | Software: Samsara + ZAM</span>
-                    </div>
-                  </button>
 
-                  {/* Selector 3: Km Cargados */}
-                  <button
-                    onClick={() => setActiveKpi("kmCargados")}
-                    className={cn(
-                      "group text-left p-4 rounded-xl border transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[110px] backdrop-blur-md shadow-sm",
-                      activeKpi === "kmCargados"
-                        ? "bg-gradient-to-br from-primary/25 to-primary/5 border-primary shadow-[0_0_12px_rgba(59,130,246,0.2)] font-semibold"
-                        : "bg-card/55 border-border/30 hover:border-border/60"
-                    )}
-                  >
-                    <div className="flex justify-between items-start w-full">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">% Km Cargados</span>
-                      <span className={cn(
-                        "h-2 w-2 rounded-full",
-                        avgKmCargados >= 60 ? "bg-success" : avgKmCargados >= 50 ? "bg-warning" : "bg-destructive"
-                      )} />
+                    {/* Dial 3: Operadores Activos */}
+                    <div className="flex flex-col items-center">
+                      <div className="relative h-24 w-24">
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                          <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.05)" strokeWidth="8" fill="transparent" />
+                          <circle cx="50" cy="50" r="40" stroke={avgOperadoresRatio >= 0.95 ? "#10B981" : avgOperadoresRatio >= 0.8 ? "#F59E0B" : "#EF4444"} strokeWidth="8" fill="transparent"
+                            strokeDasharray={251.2}
+                            strokeDashoffset={251.2 - (251.2 * Math.min(100, (avgOperadoresRatio / 1.5) * 100)) / 100}
+                            className="transition-all duration-1000"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-sm font-black text-foreground">{totalOperadores} / {filteredTractos.length}</span>
+                          <span className="text-[8px] text-muted-foreground font-bold">OPs</span>
+                        </div>
+                      </div>
+                      <span className="text-[9px] text-muted-foreground mt-1 text-center font-semibold">Meta: 1.0 (1 Op / Unidad)</span>
                     </div>
-                    <div className="mt-2 flex items-baseline justify-between w-full">
-                      <p className="text-2xl font-black font-display text-foreground">{avgKmCargados}%</p>
-                      <span className="text-[10px] text-success font-semibold flex items-center">▲ 2%</span>
-                    </div>
-                    <div className="mt-1 flex flex-col text-[7.5px] text-muted-foreground/80 leading-tight">
-                      <span className="font-bold text-primary-glow">Fórmula: (Km Cargados / Km Totales) × 100</span>
-                      <span>Meta: &gt;50% | Software: Samsara</span>
-                    </div>
-                  </button>
+                  </CardContent>
+                </Card>
 
-                  {/* Selector 4: Renovacion */}
-                  <button
-                    onClick={() => setActiveKpi("renovacion")}
-                    className={cn(
-                      "group text-left p-4 rounded-xl border transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[110px] backdrop-blur-md shadow-sm",
-                      activeKpi === "renovacion"
-                        ? "bg-gradient-to-br from-primary/25 to-primary/5 border-primary shadow-[0_0_12px_rgba(59,130,246,0.2)] font-semibold"
-                        : "bg-card/55 border-border/30 hover:border-border/60"
-                    )}
-                  >
-                    <div className="flex justify-between items-start w-full">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Equilibrio Renovación</span>
-                      <span className={cn(
-                        "h-2 w-2 rounded-full",
-                        unitsToRenew === 0 ? "bg-success" : unitsToRenew <= 2 ? "bg-warning" : "bg-destructive"
-                      )} />
-                    </div>
-                    <div className="mt-2 flex items-baseline justify-between w-full">
-                      <p className="text-2xl font-black font-display text-foreground">{unitsToRenew} uds.</p>
-                      <span className="text-[10px] text-destructive font-semibold flex items-center">▼ 1%</span>
-                    </div>
-                    <div className="mt-1 flex flex-col text-[7.5px] text-muted-foreground/80 leading-tight">
-                      <span className="font-bold text-primary-glow">Fórmula: (Costo Mtto + Comb. Exc.) vs Arrendamiento</span>
-                      <span>Meta: 0 críticas | Software: ZAM + Samsara</span>
-                    </div>
-                  </button>
-
-                  {/* Selector 5: Capacidad */}
-                  <button
-                    onClick={() => setActiveKpi("capacidad")}
-                    className={cn(
-                      "group text-left p-4 rounded-xl border transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[110px] backdrop-blur-md shadow-sm",
-                      activeKpi === "capacidad"
-                        ? "bg-gradient-to-br from-primary/25 to-primary/5 border-primary shadow-[0_0_12px_rgba(59,130,246,0.2)] font-semibold"
-                        : "bg-card/55 border-border/30 hover:border-border/60"
-                    )}
-                  >
-                    <div className="flex justify-between items-start w-full">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Capacidad Instalada</span>
-                      <span className="h-2 w-2 rounded-full bg-success" />
-                    </div>
-                    <div className="mt-2 flex items-baseline justify-between w-full">
-                      <p className="text-2xl font-black font-display text-foreground">{capInst}</p>
-                      <span className="text-[10px] text-success font-semibold flex items-center">▲ 5%</span>
-                    </div>
-                    <div className="mt-1 flex flex-col text-[7.5px] text-muted-foreground/80 leading-tight">
-                      <span className="font-bold text-primary-glow">Fórmula: Viajes / Unidad</span>
-                      <span>Meta: Frecuencia Mensual | Software: ZAM</span>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Main Visual Display (2 columns) */}
-                <Card className="lg:col-span-2 shadow-[var(--shadow-card)] bg-card/65 backdrop-blur-lg border border-border/30 relative overflow-hidden flex flex-col justify-between h-[590px]">
+                {/* Module 2: Interactive EBITDA Leakage Funnel */}
+                <Card className="lg:col-span-2 shadow-[var(--shadow-card)] bg-card/65 backdrop-blur-lg border border-border/30 relative overflow-hidden flex flex-col justify-between p-4 h-[590px]">
                   <div className="absolute top-0 right-0 h-40 w-40 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-bold uppercase tracking-wider text-primary">
-                      Desglose Comparativo por Unidad de Negocio
+                  <CardHeader className="p-0 pb-3">
+                    <CardTitle className="text-xs font-black uppercase tracking-wider text-muted-foreground flex justify-between">
+                      <span>Interactive EBITDA Leakage Funnel</span>
+                      <span className="text-[9px] font-mono text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">Fórmula de Cascada de Pérdida</span>
                     </CardTitle>
-                    <CardDescription className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 leading-relaxed">
-                      <span>
-                        Visualización de {activeKpi === "equipoAsignado" ? "Distribución de Flota" : activeKpi === "utilizacion" ? "Porcentaje de Utilización" : activeKpi === "kmCargados" ? "Eficiencia de Km" : activeKpi === "renovacion" ? "Unidades Excedidas en Renovación" : "Rotación de Viajes Mensuales"}
-                      </span>
-                      <span className="text-[9px] bg-muted/90 px-2 py-0.5 rounded border border-border/30 font-mono font-bold text-primary shrink-0">
-                        {activeKpi === "equipoAsignado" && "Fórmula: Conteo de Tractocamiones por BU"}
-                        {activeKpi === "utilizacion" && "Fórmula: (Horas Productivas / Horas Disponibles) × 100"}
-                        {activeKpi === "kmCargados" && "Fórmula: (Km Cargados / Km Totales) × 100"}
-                        {activeKpi === "renovacion" && "Fórmula: (Costo Mtto Mensual + Costo Combustible Excedente) vs Arrendamiento"}
-                        {activeKpi === "capacidad" && "Fórmula: Viajes / Unidad"}
-                      </span>
+                    <CardDescription className="text-[10px]">
+                      Haz clic en cada sección del embudo para auditar la fuga y el rendimiento de las Unidades de Negocio.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="flex-1 min-h-0 pt-2">
-                    <ResponsiveContainer width="100%" height="100%">
-                      {activeKpi === "equipoAsignado" ? (
-                        <BarChart data={buPerformanceData} margin={{ top: 10, right: 10, left: 25, bottom: 30 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" strokeOpacity={0.05} />
-                          <XAxis dataKey="shortName" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8 }} angle={-25} textAnchor="end" interval={0} height={60} />
-                          <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }} />
-                          <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '11px' }} />
-                          <Bar dataKey="totalTractos" name="Tractos Asignados" fill="#8B5CF6" radius={[4, 4, 0, 0]} maxBarSize={24} />
-                        </BarChart>
-                      ) : activeKpi === "utilizacion" ? (
-                        <BarChart data={buPerformanceData} margin={{ top: 10, right: 10, left: 25, bottom: 30 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" strokeOpacity={0.05} />
-                          <XAxis dataKey="shortName" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8 }} angle={-25} textAnchor="end" interval={0} height={60} />
-                          <YAxis domain={[0, 100]} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }} />
-                          <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '11px' }} />
-                          <Bar dataKey="utilizacion" name="Utilización (%)" fill="#3B82F6" radius={[4, 4, 0, 0]} maxBarSize={24}>
-                            {buPerformanceData.map((entry: any, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.utilizacion >= 80 ? "#10B981" : entry.utilizacion >= 70 ? "#F59E0B" : "#EF4444"} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      ) : activeKpi === "kmCargados" ? (
-                        <BarChart data={buPerformanceData} margin={{ top: 10, right: 10, left: 25, bottom: 30 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" strokeOpacity={0.05} />
-                          <XAxis dataKey="shortName" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8 }} angle={-25} textAnchor="end" interval={0} height={60} />
-                          <YAxis domain={[0, 100]} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }} />
-                          <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '11px' }} />
-                          <Legend wrapperStyle={{ fontSize: '9px', marginTop: '-10px' }} />
-                          <Bar dataKey="kmCargados" name="Km Cargados (%)" stackId="a" fill="#10B981" maxBarSize={24} />
-                          <Bar dataKey="kmVacios" name="Km Vacíos (%)" stackId="a" fill="#EF4444" radius={[4, 4, 0, 0]} maxBarSize={24} />
-                        </BarChart>
-                      ) : activeKpi === "renovacion" ? (
-                        <BarChart data={buPerformanceData} layout="vertical" margin={{ top: 10, right: 10, left: 15, bottom: 10 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" strokeOpacity={0.05} />
-                          <XAxis type="number" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }} />
-                          <YAxis dataKey="shortName" type="category" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8 }} width={90} />
-                          <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '11px' }} />
-                          <Bar dataKey="renovacion" name="Unidades Críticas" fill="#EF4444" radius={[0, 4, 4, 0]} maxBarSize={24} />
-                        </BarChart>
-                      ) : (
-                        <AreaChart data={buPerformanceData} margin={{ top: 10, right: 10, left: 25, bottom: 30 }}>
-                          <defs>
-                            <linearGradient id="colorCapacidad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3} />
-                              <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" strokeOpacity={0.05} />
-                          <XAxis dataKey="shortName" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8 }} angle={-25} textAnchor="end" interval={0} height={60} />
-                          <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }} />
-                          <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '11px' }} />
-                          <Area type="monotone" dataKey="capacidad" name="Viajes/Ud" stroke="#8B5CF6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorCapacidad)" />
-                        </AreaChart>
-                      )}
-                    </ResponsiveContainer>
+
+                  <CardContent className="p-0 flex-1 flex flex-col justify-center items-center">
+                    <div className="w-full max-w-[340px] space-y-2 relative">
+                      {/* Step 1: Ingreso por Tracto */}
+                      <button
+                        onClick={() => setActiveFunnelStep("ingreso")}
+                        className={cn(
+                          "w-full clip-path-funnel-1 h-14 bg-gradient-to-r transition-all duration-300 relative flex flex-col items-center justify-center px-4 border-b border-background/25",
+                          activeFunnelStep === "ingreso"
+                            ? "from-blue-600 to-indigo-700 shadow-lg scale-105 z-10 brightness-110 font-bold"
+                            : "from-blue-600/30 to-indigo-700/35 hover:brightness-105 border border-white/5"
+                        )}
+                      >
+                        <span className="text-[9px] font-bold tracking-wider text-white/90 uppercase mb-0.5">1. Ingresos por Tracto</span>
+                        <span className="text-xs font-black text-white">{formatUSD(revPerTracto)}</span>
+                      </button>
+
+                      {/* Step 2: Venta por Km */}
+                      <button
+                        onClick={() => setActiveFunnelStep("venta")}
+                        className={cn(
+                          "w-full clip-path-funnel-2 h-14 bg-gradient-to-r transition-all duration-300 relative flex flex-col items-center justify-center px-4 border-b border-background/25",
+                          activeFunnelStep === "venta"
+                            ? "from-cyan-500 to-blue-600 shadow-lg scale-105 z-10 brightness-110 font-bold"
+                            : "from-cyan-500/30 to-blue-600/35 hover:brightness-105 border border-white/5"
+                        )}
+                      >
+                        <span className="text-[9px] font-bold tracking-wider text-white/90 uppercase mb-0.5">2. Venta por Km</span>
+                        <span className="text-xs font-black text-white">{formatUSD(salePerKm)}/km</span>
+                      </button>
+
+                      {/* Step 3: Productividad $/Hora */}
+                      <button
+                        onClick={() => setActiveFunnelStep("prod")}
+                        className={cn(
+                          "w-full clip-path-funnel-3 h-14 bg-gradient-to-r transition-all duration-300 relative flex flex-col items-center justify-center px-4 border-b border-background/25",
+                          activeFunnelStep === "prod"
+                            ? "from-teal-500 to-emerald-600 shadow-lg scale-105 z-10 brightness-110 font-bold"
+                            : "from-teal-500/30 to-emerald-600/35 hover:brightness-105 border border-white/5"
+                        )}
+                      >
+                        <span className="text-[9px] font-bold tracking-wider text-white/90 uppercase mb-0.5">3. Productividad $/Hr</span>
+                        <span className="text-xs font-black text-white">{formatUSD(prodPerHr)}/hr</span>
+                      </button>
+
+                      {/* Step 4: Costo Operativo por Km */}
+                      <button
+                        onClick={() => setActiveFunnelStep("costo")}
+                        className={cn(
+                          "w-full clip-path-funnel-4 h-14 bg-gradient-to-r transition-all duration-300 relative flex flex-col items-center justify-center px-4 border-b border-background/25",
+                          activeFunnelStep === "costo"
+                            ? "from-amber-500 to-red-600 shadow-lg scale-105 z-10 brightness-110 font-bold"
+                            : "from-amber-500/30 to-red-600/35 hover:brightness-105 border border-white/5"
+                        )}
+                      >
+                        <span className="text-[9px] font-bold tracking-wider text-white/90 uppercase mb-0.5">4. Costo por Km</span>
+                        <span className="text-xs font-black text-white">{formatUSD(costPerKm)}/km</span>
+                      </button>
+
+                      {/* Step 5: Utilidad EBITDA por Unidad */}
+                      <button
+                        onClick={() => setActiveFunnelStep("utilidad")}
+                        className={cn(
+                          "w-full clip-path-funnel-5 h-14 bg-gradient-to-r transition-all duration-300 relative flex flex-col items-center justify-center px-4",
+                          activeFunnelStep === "utilidad"
+                            ? "from-emerald-500 to-green-600 shadow-lg scale-105 z-10 brightness-110 font-bold"
+                            : "from-emerald-500/30 to-green-600/35 hover:brightness-105 border border-white/5"
+                        )}
+                      >
+                        <span className="text-[9px] font-bold tracking-wider text-white/90 uppercase mb-0.5">5. Utilidad EBITDA</span>
+                        <span className="text-xs font-black text-white">{formatUSD(utilPerUnit)}</span>
+                      </button>
+                    </div>
                   </CardContent>
+
+                  {/* Diagnóstico del Step Activo en la parte inferior */}
+                  <CardFooter className="p-0 pt-3 border-t border-border/10 flex flex-col items-start gap-1">
+                    <span className="text-[9px] uppercase font-bold text-primary tracking-wider">
+                      {activeFunnelStep === "ingreso" && "Auditoría: Ingreso Promedio por Tractor"}
+                      {activeFunnelStep === "venta" && "Auditoría: Eficiencia por Ruta (Venta/Km)"}
+                      {activeFunnelStep === "prod" && "Auditoría: Eficiencia Productiva Temporal ($/Hr)"}
+                      {activeFunnelStep === "costo" && "Fuga Detectada: Costo de Operación/Km"}
+                      {activeFunnelStep === "utilidad" && "EBITDA Final: Utilidad Neta por Unidad"}
+                    </span>
+                    <p className="text-[10px] text-muted-foreground leading-normal">
+                      {activeFunnelStep === "ingreso" && `Las unidades consolidan un promedio de ${formatUSD(revPerTracto)} de ingresos. Bachoco Lagos encabeza la generación por tractor debido a alta frecuencia de rutas cortas.`}
+                      {activeFunnelStep === "venta" && `Venta por kilómetro promedio de ${formatUSD(salePerKm)}/km. Las operaciones tipo FULL en Refinados Veracruz superan considerablemente el rendimiento del viaje sencillo.`}
+                      {activeFunnelStep === "prod" && `Cada hora operativa del motor genera un promedio de ${formatUSD(prodPerHr)} de facturación consolidada. Indica una correcta optimización de los tiempos de carga en terminales.`}
+                      {activeFunnelStep === "costo" && `El costo operativo directo es de ${formatUSD(costPerKm)}/km. La mayor fuga se registra en diésel y mantenimiento correctivo en unidades con antigüedad mayor a 5 años.`}
+                      {activeFunnelStep === "utilidad" && `Utilidad neta promedio de ${formatUSD(utilPerUnit)} por tractor. El margen EBITDA consolidado se mantiene estable en ${(totalRevenue ? ((totalUtility / totalRevenue) * 100) : 0).toFixed(1)}% con meta de superación.`}
+                    </p>
+                  </CardFooter>
                 </Card>
 
-                {/* Right Diagnostic Panel (1 column) */}
-                <Card className="lg:col-span-1 shadow-[var(--shadow-card)] bg-card/65 backdrop-blur-lg border border-border/30 relative overflow-hidden flex flex-col justify-between h-[590px]">
+                {/* Module 3: EBITDA Reallocation Simulator */}
+                <Card className="lg:col-span-1 shadow-[var(--shadow-card)] bg-card/65 backdrop-blur-lg border border-border/30 relative overflow-hidden flex flex-col justify-between p-4 h-[590px]">
                   <div className="absolute top-0 right-0 h-32 w-32 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                      <Sparkles className="h-4 w-4 text-gold" /> Diagnóstico BI
+                  <CardHeader className="p-0 pb-3">
+                    <CardTitle className="text-xs font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                      <Sliders className="h-4.5 w-4.5 text-gold" /> Reallocation Simulator
                     </CardTitle>
-                    <CardDescription>Análisis operativo calculado en base a la telemetría viva.</CardDescription>
+                    <CardDescription className="text-[10px]">Proyecta el impacto EBITDA optimizando diésel o reduciendo costos.</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4 flex-1 flex flex-col justify-between">
-                    <div className="space-y-3">
-                      {/* Top Performer */}
-                      <div className="p-3 border rounded-xl bg-success/5 border-success/20">
-                        <span className="text-[9px] uppercase font-bold text-success/80 tracking-wider block">{diag?.topLabel}</span>
-                        <span className="text-xs font-bold text-foreground mt-0.5 block">{diag?.topName}</span>
-                        <span className="text-lg font-black text-success mt-1 block">{diag?.topVal}</span>
-                      </div>
 
-                      {/* Worst Performer */}
-                      <div className="p-3 border rounded-xl bg-destructive/5 border-destructive/20">
-                        <span className="text-[9px] uppercase font-bold text-destructive/80 tracking-wider block">{diag?.bottomLabel}</span>
-                        <span className="text-xs font-bold text-foreground mt-0.5 block">{diag?.bottomName}</span>
-                        <span className="text-lg font-black text-destructive mt-1 block">{diag?.bottomVal}</span>
+                  <CardContent className="p-0 flex-1 flex flex-col justify-center gap-6">
+                    {/* Slider 1: Diesel Optimization */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs">
+                        <span className="font-semibold text-muted-foreground text-[10px] uppercase">Optimización Diésel</span>
+                        <span className="font-bold text-success">+{simDieselOpt}%</span>
                       </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="15"
+                        value={simDieselOpt}
+                        onChange={(e) => setSimDieselOpt(Number(e.target.value))}
+                        className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-success"
+                      />
+                      <span className="text-[8px] text-muted-foreground block">Reduce el gasto en combustible a través de rutas eficientes.</span>
                     </div>
 
-                    <div className="text-[10px] leading-relaxed text-muted-foreground bg-muted/30 p-3 rounded-lg border border-border/10">
-                      <span className="font-semibold text-primary block mb-1">💡 Análisis de Consola:</span>
-                      {diag?.insight}
+                    {/* Slider 2: Cost per Km Reduction */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs">
+                        <span className="font-semibold text-muted-foreground text-[10px] uppercase">Reducción de Costo Directo</span>
+                        <span className="font-bold text-success">-${simCostReduction} MXN/km</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="5"
+                        step="0.5"
+                        value={simCostReduction}
+                        onChange={(e) => setSimCostReduction(Number(e.target.value))}
+                        className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-success"
+                      />
+                      <span className="text-[8px] text-muted-foreground block">Mejora mantenimiento preventivo y costo operativo por km.</span>
+                    </div>
+
+                    {/* Resulting Projections */}
+                    <div className="pt-4 border-t border-border/10 space-y-4">
+                      <div className="p-3 border rounded-xl bg-success/5 border-success/20">
+                        <span className="text-[9px] uppercase font-bold text-success tracking-wider block">Incremento de Utilidad EBITDA</span>
+                      <span className="text-lg font-black text-success mt-0.5 block">+{formatUSD(simulatedEbitdaDelta)} / mes</span>
+                      </div>
+
+                      <div className="p-3 border rounded-xl bg-primary/5 border-primary/20">
+                        <span className="text-[9px] uppercase font-bold text-primary tracking-wider block">Margen EBITDA Proyectado</span>
+                        <span className="text-lg font-black text-primary mt-0.5 block">{simulatedMargin.toFixed(1)}%</span>
+                      </div>
                     </div>
                   </CardContent>
-                </Card>
-              </div>
+                </Card>              </div>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 border-b pb-2">
-                <div className="h-4 w-1 bg-success rounded-full" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-success">🟢 KPIs Financieros (Rentabilidad)</h3>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <KpiCard
-                  label="Ingresos por Tracto"
-                  value={formatUSD(revPerTracto)}
-                  delta={6}
-                  icon={DollarSign}
-                  category="financial"
-                  formula="Ingresos totales / Número de tractos"
-                  meta="Positiva incremental"
-                  progreso={85}
-                  semaforo="green"
-                  fuente="ZAM + Samsara"
-                />
-                <KpiCard
-                  label="Venta por km"
-                  value={`${formatUSD(salePerKm)}/km`}
-                  delta={3}
-                  icon={DollarSign}
-                  category="financial"
-                  formula="Ingresos totales / Kilómetros totales"
-                  meta="FULL debe superar Sencillo"
-                  progreso={Math.min(100, (salePerKm / 3.0) * 100)}
-                  semaforo={salePerKm >= 2.3 ? "green" : salePerKm >= 2.0 ? "yellow" : "red"}
-                  fuente="ZAM + Samsara"
-                />
-                <KpiCard
-                  label="Productividad $/hora"
-                  value={`${formatUSD(prodPerHr)}/hr`}
-                  delta={4}
-                  icon={Gauge}
-                  category="financial"
-                  formula="Ingresos totales / Horas operadas"
-                  meta="Tendencia incremental"
-                  progreso={78}
-                  semaforo="green"
-                  fuente="ZAM + Samsara"
-                />
-                <KpiCard
-                  label="Utilidad por unidad"
-                  value={formatUSD(utilPerUnit)}
-                  delta={8}
-                  icon={TrendingUp}
-                  category="financial"
-                  formula="Ingresos - Costos directos operativos"
-                  meta="Positiva"
-                  progreso={82}
-                  semaforo={utilPerUnit > 10000 ? "green" : utilPerUnit > 0 ? "yellow" : "red"}
-                  fuente="ZAM ERP"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3">
+            {/* Fleet Health Gauge Cluster & Risk Simulator (Alternative 2) */}
+            <div className="space-y-4">
               <div className="flex items-center gap-2 border-b pb-2">
                 <div className="h-4 w-1 bg-warning rounded-full" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-warning">🔴 KPIs de Mantenimiento & Seguridad</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-warning">🛠️ SISTEMA DE SALUD DE FLOTA & RIESGO ACTIVO</h3>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <KpiCard
-                  label="Disponibilidad Mecánica"
-                  value={`${mechanicalAvailability.toFixed(1)}%`}
-                  delta={1.2}
-                  icon={Clock}
-                  category="maintenance"
-                  formula="(1 - Días taller / Días calendario) × 100"
-                  meta="Meta: >90% disponible"
-                  progreso={mechanicalAvailability}
-                  semaforo={mechanicalAvailability >= 90 ? "green" : mechanicalAvailability >= 85 ? "yellow" : "red"}
-                  fuente="ZAM + Samsara"
-                />
-                <KpiCard
-                  label="Score de Seguridad"
-                  value={`${(avgSafetyScore * 100).toFixed(2)}%`}
-                  delta={-5}
-                  icon={Shield}
-                  category="maintenance"
-                  formula="Eventos frenada brusca / Kilómetros"
-                  meta="Meta: < 0.20% incidencias"
-                  progreso={Math.max(0, 100 - (avgSafetyScore * 100 * 5))}
-                  semaforo={avgSafetyScore <= 0.15 ? "green" : avgSafetyScore <= 0.20 ? "yellow" : "red"}
-                  fuente="Samsara"
-                />
-                <KpiCard
-                  label="Costo por km Mantto"
-                  value={`${formatUSD(maintCostPerKm)}/km`}
-                  delta={-4}
-                  icon={Container}
-                  category="maintenance"
-                  formula="Costo mantenimiento / Kilómetros totales"
-                  meta="Mantener bajo mensualidad nuevo activo"
-                  progreso={Math.min(100, (0.3 / Math.max(0.05, maintCostPerKm)) * 100)}
-                  semaforo={maintCostPerKm < 0.2 ? "green" : maintCostPerKm < 0.3 ? "yellow" : "red"}
-                  fuente="ZAM + Samsara"
-                />
+
+              <div className="grid gap-6 lg:grid-cols-3">
+                {/* Column 1: The Fleet Health Gauge Cluster */}
+                <Card className="lg:col-span-2 shadow-[var(--shadow-card)] bg-card/65 backdrop-blur-lg border border-border/30 relative overflow-hidden flex flex-col justify-between p-4 h-[350px]">
+                  <div className="absolute top-0 right-0 h-32 w-32 bg-warning/5 rounded-full blur-2xl pointer-events-none" />
+                  <CardHeader className="p-0 pb-2">
+                    <CardTitle className="text-xs font-black uppercase tracking-wider text-muted-foreground">Medidores de Salud en Operación</CardTitle>
+                    <CardDescription className="text-[10px]">Indicadores telemáticos y de taller calibrados en base a límites del Excel.</CardDescription>
+                  </CardHeader>
+
+                  <CardContent className="p-0 flex-1 flex justify-around items-center gap-4">
+                    {/* Gauge 1: Mechanical Availability */}
+                    <div className="flex flex-col items-center">
+                      <div className="relative h-28 w-28">
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                          <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.05)" strokeWidth="7" fill="transparent" />
+                          <circle cx="50" cy="50" r="40" stroke={mechanicalAvailability >= 90 ? "#10B981" : mechanicalAvailability >= 85 ? "#F59E0B" : "#EF4444"} strokeWidth="7" fill="transparent"
+                            strokeDasharray={251.2}
+                            strokeDashoffset={251.2 - (251.2 * mechanicalAvailability) / 100}
+                            className="transition-all duration-1000"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-sm font-black text-foreground">{mechanicalAvailability.toFixed(1)}%</span>
+                          <span className="text-[7.5px] text-muted-foreground font-bold">DISP. MEC</span>
+                        </div>
+                      </div>
+                      <span className="text-[8.5px] text-muted-foreground mt-1 text-center font-bold">Meta: &gt;90% | Semáforo: {mechanicalAvailability >= 90 ? "💚" : "💛"}</span>
+                    </div>
+
+                    {/* Gauge 2: Safety Score */}
+                    <div className="flex flex-col items-center">
+                      <div className="relative h-28 w-28">
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                          <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.05)" strokeWidth="7" fill="transparent" />
+                          <circle cx="50" cy="50" r="40" stroke={avgSafetyScore * 100 < 0.15 ? "#10B981" : avgSafetyScore * 100 <= 0.20 ? "#F59E0B" : "#EF4444"} strokeWidth="7" fill="transparent"
+                            strokeDasharray={251.2}
+                            strokeDashoffset={251.2 - (251.2 * Math.min(100, (avgSafetyScore * 100) / 0.3)) / 100}
+                            className="transition-all duration-1000"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-xs font-black text-foreground">{(avgSafetyScore * 100).toFixed(3)}%</span>
+                          <span className="text-[7.5px] text-muted-foreground font-bold">SEGURIDAD</span>
+                        </div>
+                      </div>
+                      <span className="text-[8.5px] text-muted-foreground mt-1 text-center font-bold">Meta: &lt;0.20% | Semáforo: {avgSafetyScore * 100 < 0.20 ? "💚" : "❤️"}</span>
+                    </div>
+
+                    {/* Gauge 3: Maint Cost per Km */}
+                    <div className="flex flex-col items-center">
+                      <div className="relative h-28 w-28">
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                          <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.05)" strokeWidth="7" fill="transparent" />
+                          <circle cx="50" cy="50" r="40" stroke={maintCostPerKm < 3.0 ? "#10B981" : maintCostPerKm < 4.5 ? "#F59E0B" : "#EF4444"} strokeWidth="7" fill="transparent"
+                            strokeDasharray={251.2}
+                            strokeDashoffset={251.2 - (251.2 * Math.min(100, (maintCostPerKm / 5.0) * 100)) / 100}
+                            className="transition-all duration-1000"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-xs font-black text-foreground">{formatUSD(maintCostPerKm)}/km</span>
+                          <span className="text-[7px] text-muted-foreground font-bold">COSTO MTTO</span>
+                        </div>
+                      </div>
+                      <span className="text-[8.5px] text-muted-foreground mt-1 text-center font-bold">Meta: Reducido | Semáforo: {maintCostPerKm < 3.0 ? "💚" : "💛"}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Column 2: Operational Risk Simulator */}
+                <Card className="lg:col-span-1 shadow-[var(--shadow-card)] bg-card/65 backdrop-blur-lg border border-border/30 relative overflow-hidden flex flex-col justify-between p-4 h-[350px]">
+                  <div className="absolute top-0 right-0 h-32 w-32 bg-warning/5 rounded-full blur-2xl pointer-events-none" />
+                  <CardHeader className="p-0 pb-2">
+                    <CardTitle className="text-xs font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Sliders className="h-4 w-4 text-gold animate-spin-slow" /> Operational Risk Simulator
+                    </CardTitle>
+                    <CardDescription className="text-[10px]">Ahorro en desgaste (llantas, frenos) mejorando manejo.</CardDescription>
+                  </CardHeader>
+
+                  <CardContent className="p-0 flex-1 flex flex-col justify-center gap-3">
+                    {/* Slider 1: Reduction in Harsh Braking */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[10px]">
+                        <span className="font-semibold text-muted-foreground uppercase">Mejora Hábito de Manejo</span>
+                        <span className="font-bold text-success">-{simSafetyImprovement}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="50"
+                        value={simSafetyImprovement}
+                        onChange={(e) => setSimSafetyImprovement(Number(e.target.value))}
+                        className="w-full h-1 bg-muted rounded appearance-none cursor-pointer accent-success"
+                      />
+                    </div>
+
+                    {/* Slider 2: Reduction in Downtime shop days */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[10px]">
+                        <span className="font-semibold text-muted-foreground uppercase">Reducción Días de Taller</span>
+                        <span className="font-bold text-success">-{simDowntimeReduction}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="30"
+                        value={simDowntimeReduction}
+                        onChange={(e) => setSimDowntimeReduction(Number(e.target.value))}
+                        className="w-full h-1 bg-muted rounded appearance-none cursor-pointer accent-success"
+                      />
+                    </div>
+
+                    {/* Resulting Forecast */}
+                    <div className="pt-2 border-t border-border/10">
+                      <div className="p-2.5 border rounded-lg bg-success/5 border-success/15 flex items-center justify-between">
+                        <div>
+                          <span className="text-[8px] uppercase font-bold text-success tracking-wider block">Ahorro Mantenimiento Est.</span>
+                          <span className="text-base font-black text-success mt-0.5 block">+{formatUSD(totalMaintSavingsProyected)} / mes</span>
+                        </div>
+                        <div className="h-7 w-7 bg-success/10 rounded-full flex items-center justify-center text-success">
+                          <TrendingUp className="h-3.5 w-3.5" />
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </div>
-          </div>
 
 
         </TabsContent>

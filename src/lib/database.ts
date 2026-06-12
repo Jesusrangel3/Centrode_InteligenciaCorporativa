@@ -3245,7 +3245,7 @@ const generateRemolques = (): Remolque[] => {
 };
 
 const INITIAL_CONFIG: SystemConfig = {
-  samsaraApiKey: import.meta.env.VITE_SAMSARA_API_KEY || "",
+  samsaraApiKey: "",
   zamBaseUrl: "http://10.0.0.25:9081",
   metaUtilizacionFull: 80,
   metaUtilizacionRefrigerado: 90,

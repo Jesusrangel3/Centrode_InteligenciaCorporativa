@@ -155,7 +155,7 @@ function getRemolqueMaintenanceMetrics(r: Remolque) {
   const preventivoDays = Math.round(r.diasTaller * 0.3) || 1;
   
   const correctivoCount = r.diasTaller > 8 ? 3 : r.diasTaller > 4 ? 2 : r.diasTaller > 0 ? 1 : 0;
-  const downtimeCost = correctivoDays * 150; // $150 USD loss per day for trailer
+  const downtimeCost = correctivoDays * 3000; // $3,000 MXN loss per day for trailer
   
   const totalCost = r.costoKmMantto * r.kmRecorridos;
   const correctivoCost = totalCost * 0.7;
@@ -362,7 +362,7 @@ function RemolquesPage() {
       "Utilizacion (%)",
       "Km Recorridos",
       "Dias en Taller",
-      "Costo Mantto por Km (USD)",
+      "Costo Mantto por Km (MXN)",
     ];
 
     const csvRows = [

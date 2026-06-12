@@ -256,3 +256,21 @@
   border: none !important;
 }
 
+/* Custom EBITDA Funnel Step Clip Paths */
+.clip-path-funnel-1 {
+  clip-path: polygon(0% 0%, 100% 0%, 94% 100%, 6% 100%);
+}
+.clip-path-funnel-2 {
+  clip-path: polygon(6% 0%, 94% 0%, 88% 100%, 12% 100%);
+}
+.clip-path-funnel-3 {
+  clip-path: polygon(12% 0%, 88% 0%, 82% 100%, 18% 100%);
+}
+.clip-path-funnel-4 {
+  clip-path: polygon(18% 0%, 82% 0%, 76% 100%, 24% 100%);
+}
+.clip-path-funnel-5 {
+  clip-path: polygon(24% 0%, 76% 0%, 70% 100%, 30% 100%);
+}
+
+

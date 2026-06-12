@@ -128,7 +128,7 @@ function ProductividadPage() {
   const [expandedBU, setExpandedBU] = useState<Record<string, boolean>>({});
   
   // Tab states
-  const [leaseCost, setLeaseCost] = useState<number>(1500); // Default $1500 USD new lease
+  const [leaseCost, setLeaseCost] = useState<number>(30000); // Default $30,000 MXN new lease
   const [selectedBUForTrend, setSelectedBUForTrend] = useState<string>("REFINADOS LAZARO");
   const [showEmptyCost, setShowEmptyCost] = useState<boolean>(false);
 
@@ -820,7 +820,7 @@ function ProductividadPage() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-3 bg-muted/50 p-2 rounded-lg border max-w-xs shrink-0">
-                <span className="text-xs font-semibold text-muted-foreground shrink-0">Mensualidad Arrendamiento (USD):</span>
+                <span className="text-xs font-semibold text-muted-foreground shrink-0">Mensualidad Arrendamiento (MXN):</span>
                 <Input
                   type="number"
                   value={leaseCost}
@@ -833,7 +833,7 @@ function ProductividadPage() {
               <div className="bg-amber-50 border border-amber-200/50 rounded-xl p-4 flex items-start gap-3 text-xs text-amber-800">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
                 <p>
-                  <strong>Regla Operativa Financiera:</strong> Si el costo de mantener la unidad vieja (Mantenimiento Mensual + Exceso de Combustible) es superior a la mensualidad de arrendamiento de una unidad nueva (USD {leaseCost.toLocaleString()}), la decisión financiera técnica obliga a **renovar el activo**.
+                  <strong>Regla Operativa Financiera:</strong> Si el costo de mantener la unidad vieja (Mantenimiento Mensual + Exceso de Combustible) es superior a la mensualidad de arrendamiento de una unidad nueva (MXN {leaseCost.toLocaleString()}), la decisión financiera técnica obliga a **renovar el activo**.
                 </p>
               </div>
 

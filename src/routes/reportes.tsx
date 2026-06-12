@@ -480,8 +480,8 @@ function ReportesPage() {
                       <YAxis tick={{ fontSize: 10, fill: "#475569" }} />
                       <ChartTooltip formatter={(value: any) => formatUSD(Number(value))} />
                       <Legend wrapperStyle={{ fontSize: 10 }} />
-                      <Bar dataKey="ingresos" name="Ingresos (USD)" fill="#1e3a8a" radius={[2, 2, 0, 0]} />
-                      <Bar dataKey="utilidad" name="Utilidad (USD)" fill="#10b981" radius={[2, 2, 0, 0]} />
+                      <Bar dataKey="ingresos" name="Ingresos (MXN)" fill="#1e3a8a" radius={[2, 2, 0, 0]} />
+                      <Bar dataKey="utilidad" name="Utilidad (MXN)" fill="#10b981" radius={[2, 2, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -496,15 +496,15 @@ function ReportesPage() {
                   <ul className="mt-2 space-y-1.5 text-xs">
                     <li className="flex justify-between border-b py-1">
                       <span>#102 (Freightliner Cascadia - Refrigerado)</span>
-                      <span className="font-bold text-success">$24,300 USD</span>
+                      <span className="font-bold text-success">$24,300 MXN</span>
                     </li>
                     <li className="flex justify-between border-b py-1">
                       <span>#106 (Kenworth T680 - Lubricantes)</span>
-                      <span className="font-bold text-success">$19,750 USD</span>
+                      <span className="font-bold text-success">$19,750 MXN</span>
                     </li>
                     <li className="flex justify-between py-1">
                       <span>#101 (Kenworth T680 - Refinados)</span>
-                      <span className="font-bold text-success">$18,420 USD</span>
+                      <span className="font-bold text-success">$18,420 MXN</span>
                     </li>
                   </ul>
                 </div>
@@ -515,15 +515,15 @@ function ReportesPage() {
                   <ul className="mt-2 space-y-1.5 text-xs">
                     <li className="flex justify-between border-b py-1">
                       <span>#105 (Freightliner Cascadia - Inactivo)</span>
-                      <span className="font-bold text-destructive">-$1,240 USD</span>
+                      <span className="font-bold text-destructive">-$1,240 MXN</span>
                     </li>
                     <li className="flex justify-between border-b py-1">
                       <span>#108 (Freightliner Cascadia - Inactivo)</span>
-                      <span className="font-bold text-destructive">-$980 USD</span>
+                      <span className="font-bold text-destructive">-$980 MXN</span>
                     </li>
                     <li className="flex justify-between py-1">
                       <span>#103 (Kenworth T680 - Mantenimiento)</span>
-                      <span className="font-bold text-orange-600">$3,240 USD (Gasto taller: $4.6k)</span>
+                      <span className="font-bold text-orange-600">$3,240 MXN (Gasto taller: $4.6k)</span>
                     </li>
                   </ul>
                 </div>
@@ -602,7 +602,7 @@ function ReportesPage() {
                       <YAxis tick={{ fontSize: 10, fill: "#475569" }} />
                       <ChartTooltip formatter={(value: any) => formatUSD(Number(value))} />
                       <Legend wrapperStyle={{ fontSize: 10 }} />
-                      <Bar dataKey="ingresos" name="Ingresos Mensuales Unidad (USD)" fill="#b45309" radius={[2, 2, 0, 0]} />
+                      <Bar dataKey="ingresos" name="Ingresos Mensuales Unidad (MXN)" fill="#b45309" radius={[2, 2, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

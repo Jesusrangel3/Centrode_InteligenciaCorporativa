@@ -173,7 +173,7 @@ function getTractoMaintenanceMetrics(t: Tracto) {
   const correctivoDays = isMaintOrInactive ? (seed % 5) + 4 : (seed % 2); // 4-8 days if down, otherwise 0-1 days
   const correctivoCount = isMaintOrInactive ? (seed % 3) + 1 : (seed % 2); // 1-3 times if down, otherwise 0-1
   
-  const downtimeCost = correctivoDays * 450; // $450 USD loss per day
+  const downtimeCost = correctivoDays * 9000; // $9,000 MXN loss per day
   const correctivoCost = t.costoManttoMensual * 0.7;
   const preventivoCost = t.costoManttoMensual * 0.3;
 
@@ -387,7 +387,7 @@ function TractosPage() {
       "Costo por Km",
       "Rendimiento (km/L)",
       "Score Seguridad",
-      "Utilidad Real (USD)",
+      "Utilidad Real (MXN)",
       "Km Recorridos",
     ];
 
