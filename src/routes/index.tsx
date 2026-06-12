@@ -179,6 +179,25 @@ function Dashboard() {
   const clusterGroupRef = useRef<any>(null);
   const tileLayerRef = useRef<any>(null);
 
+  const [metaUtilizacion, setMetaUtilizacion] = useState<number>(70);
+
+  const EXCEL_MAYO_DATA = [
+    { area: "BACHOCO CELAYA POL", venta: 16270651.48, capInst: 30, capUtil: 29, samsaraUtil: 0.51, calcUtil: 0.52 },
+    { area: "BACHOCO CELAYA CLIE", venta: 1660458.00, capInst: 2, capUtil: 2, samsaraUtil: 0.55, calcUtil: 0.55 },
+    { area: "BACHOCO AGUAS ALIM", venta: 7858913.40, capInst: 13, capUtil: 13, samsaraUtil: 0.59, calcUtil: 0.59 },
+    { area: "BACHOCO LAGOS POLL", venta: 16805840.70, capInst: 22, capUtil: 18, samsaraUtil: 0.37, calcUtil: 0.45 },
+    { area: "BACHOCO PROCESADO", venta: 7736848.60, capInst: 20, capUtil: 20, samsaraUtil: 0.38, calcUtil: 0.38 },
+    { area: "LUBRICANTES JUMBO", venta: 3712244.00, capInst: 13, capUtil: 9, samsaraUtil: 0.23, calcUtil: 0.33 },
+    { area: "LUBRICANTES FULL", venta: 6905141.60, capInst: 24, capUtil: 19, samsaraUtil: 0.21, calcUtil: 0.26 },
+    { area: "REFINADOS LAZARO", venta: 9584457.08, capInst: 24, capUtil: 21, samsaraUtil: 0.33, calcUtil: 0.36 },
+    { area: "REFINADOS MINATITLA", venta: 14700556.18, capInst: 37, capUtil: 29, samsaraUtil: 0.29, calcUtil: 0.36 },
+    { area: "REFINADOS VERACRUZ", venta: 16333952.40, capInst: 38, capUtil: 36, samsaraUtil: 0.34, calcUtil: 0.35 },
+    { area: "REFINADOS POZA RICA", venta: 7655140.07, capInst: 19, capUtil: 19, samsaraUtil: 0.34, calcUtil: 0.34 },
+    { area: "BULKMATIC", venta: 5155002.86, capInst: 17, capUtil: 17, samsaraUtil: 0.36, calcUtil: 0.36 },
+    { area: "REFRIGERADOS", venta: 4007925.82, capInst: 20, capUtil: 13, samsaraUtil: 0.18, calcUtil: 0.28 },
+    { area: "DCARGO", venta: 546708.97, capInst: 1, capUtil: 1, samsaraUtil: 0.64, calcUtil: 0.64 },
+  ];
+
   const getBUOperationType = (buName: string) => {
     if (!buName) return "Dedicado";
     const bu = businessUnits.find(u => (u.name || "").toUpperCase() === buName.toUpperCase());
@@ -196,6 +215,46 @@ function Dashboard() {
     const matchesOp = opFilter === "TODAS" || getBUOperationType(r.unidadNegocio) === opFilter;
     return matchesBU && matchesOp;
   });
+
+  const getFilteredExcelData = () => {
+    const factor = MONTH_COEFFICIENTS[monthFilter]?.factor || 1.0;
+    const scale = factor / 0.95;
+
+    return EXCEL_MAYO_DATA.map(row => {
+      const scaledVenta = row.venta * scale;
+      const proyInst = row.samsaraUtil > 0 ? scaledVenta * ((metaUtilizacion / 100) / row.samsaraUtil) : 0;
+      const proyUtil = row.calcUtil > 0 ? scaledVenta * ((metaUtilizacion / 100) / row.calcUtil) : 0;
+
+      return {
+        ...row,
+        venta: scaledVenta,
+        proyInst,
+        proyUtil,
+      };
+    }).filter(row => {
+      if (buFilter === "TODAS") return true;
+      
+      const nameMap: Record<string, string[]> = {
+        "REFINADOS LAZARO": ["REFINADOS LAZARO"],
+        "REFINADO MINA": ["REFINADOS MINATITLA"],
+        "REFINADOS VERACRUZ": ["REFINADOS VERACRUZ"],
+        "BACHOCO LAGOS": ["BACHOCO LAGOS POLL"],
+        "BACHOCO CELAYA": ["BACHOCO CELAYA POL"],
+        "BACHOCO CLIENTES": ["BACHOCO CELAYA CLIE"],
+        "BACHOCO AGUASCALIENTES": ["BACHOCO AGUAS ALIM"],
+        "LUBRICANTES FULL": ["LUBRICANTES FULL"],
+        "LUBRICANTES JUMBO": ["LUBRICANTES JUMBO"],
+        "REFRIGERADOS": ["REFRIGERADOS"],
+        "BULKMATIC": ["BULKMATIC"],
+        "REFINADOS POZA RICA": ["REFINADOS POZA RICA"],
+        "BACHOCO PROCESADO": ["BACHOCO PROCESADO"],
+        "DRAGON CARGO": ["DCARGO"],
+      };
+
+      const targets = nameMap[buFilter] || [];
+      return targets.some(target => row.area.toUpperCase() === target.toUpperCase());
+    });
+  };
 
   // Tab 2: Simulation States
   const [simUtil, setSimUtil] = useState<number>(82); // Initial avgUtil
@@ -845,6 +904,9 @@ function Dashboard() {
             <TabsTrigger value="overview" className="text-xs font-semibold rounded-lg">Panel General</TabsTrigger>
             <TabsTrigger value="control-room" className="text-xs font-bold rounded-lg flex items-center gap-1 text-primary-glow">
               <Sparkles className="h-3.5 w-3.5" /> Sala de Control
+            </TabsTrigger>
+            <TabsTrigger value="proyecciones" className="text-xs font-bold rounded-lg flex items-center gap-1">
+              <TrendingUp className="h-3.5 w-3.5" /> Proyecciones Financieras
             </TabsTrigger>
           </TabsList>
         </div>
@@ -2016,6 +2078,311 @@ function Dashboard() {
               </CardContent>
             </Card>
           </section>
+        </TabsContent>
+
+        <TabsContent value="proyecciones" className="space-y-6">
+          {/* Top Formula Explainers */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card className="shadow-sm bg-card/65 backdrop-blur-md border border-border/30 hover:border-primary/25 transition-all duration-300">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
+                  <DollarSign className="h-4 w-4 text-primary" /> Promedio por Unidad
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-black font-display text-foreground">Venta / Cap. Utilizada</div>
+                <p className="text-[10px] text-muted-foreground mt-1 leading-normal">
+                  Mide los ingresos mensuales generados por cada camión que estuvo activo.
+                </p>
+                <div className="bg-primary/5 p-2 rounded border border-primary/10 mt-3 text-[9px] font-mono leading-tight">
+                  <span className="text-primary font-bold">Ejemplo:</span> $16,270,651 ÷ 29 = $561,056.95
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm bg-card/65 backdrop-blur-md border border-border/30 hover:border-primary/25 transition-all duration-300">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
+                  <Gauge className="h-4 w-4 text-warning" /> Samsara 24h (Doble Turno)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-black font-display text-foreground">Utilización × 2</div>
+                <p className="text-[10px] text-muted-foreground mt-1 leading-normal">
+                  Escala la telemetría a 24h. Si supera el 90%, indica necesidad de inversión.
+                </p>
+                <div className="bg-warning/5 p-2 rounded border border-warning/10 mt-3 text-[9px] font-mono leading-tight">
+                  <span className="text-warning font-bold">Alerta:</span> &gt;90% = Compra más camiones.
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm bg-card/65 backdrop-blur-md border border-border/30 hover:border-primary/25 transition-all duration-300">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
+                  <Clock className="h-4 w-4 text-destructive" /> Capacidad Potencial
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-black font-display text-foreground">Instalada - Utilizada</div>
+                <p className="text-[10px] text-muted-foreground mt-1 leading-normal">
+                  Identifica unidades ociosas o paradas que generan costo ocioso de leasing.
+                </p>
+                <div className="bg-destructive/5 p-2 rounded border border-destructive/10 mt-3 text-[9px] font-mono leading-tight">
+                  <span className="text-destructive font-bold">Alerta:</span> &lt;80% Activos = Sobra equipo.
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm bg-card/65 backdrop-blur-md border border-border/30 hover:border-primary/25 transition-all duration-300">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
+                  <TrendingUp className="h-4 w-4 text-success" /> Proyección Financiera
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-black font-display text-foreground">Venta × (Meta / Util)</div>
+                <p className="text-[10px] text-muted-foreground mt-1 leading-normal">
+                  Estima ingresos futuros si la flota trabaja a la meta de utilización deseada.
+                </p>
+                <div className="bg-success/5 p-2 rounded border border-success/10 mt-3 text-[9px] font-mono leading-tight">
+                  <span className="text-success font-bold">Meta:</span> Escala ingresos proporcionalmente.
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Interactive Simulation & Visual Charts */}
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* Left Column: Simulator Controls & Donut Capacity */}
+            <div className="lg:col-span-1 space-y-6">
+              <Card className="shadow-sm bg-card/65 backdrop-blur-md border">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-bold uppercase text-primary">Simulador de Meta de Utilización</CardTitle>
+                  <CardDescription>Ajusta el porcentaje meta de utilización para simular proyecciones de venta.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-xs font-bold">
+                      <span className="text-muted-foreground">Utilización Meta:</span>
+                      <span className="text-primary text-sm font-black">{metaUtilizacion}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="50"
+                      max="95"
+                      value={metaUtilizacion}
+                      onChange={(e) => setMetaUtilizacion(Number(e.target.value))}
+                      className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                    />
+                    <div className="flex justify-between text-[8px] font-bold text-muted-foreground font-mono">
+                      <span>50% (Bajo)</span>
+                      <span>70% (Meta Excel)</span>
+                      <span>95% (Máximo)</span>
+                    </div>
+                  </div>
+
+                  {/* Donut Chart */}
+                  {(() => {
+                    const data = getFilteredExcelData();
+                    const totalInst = data.reduce((sum, r) => sum + r.capInst, 0);
+                    const totalUtil = data.reduce((sum, r) => sum + r.capUtil, 0);
+                    const totalPot = Math.max(0, totalInst - totalUtil);
+                    const chartData = [
+                      { name: "Capacidad Utilizada", value: totalUtil, fill: "#3B82F6" },
+                      { name: "Capacidad Potencial", value: totalPot, fill: "#EF4444" },
+                    ];
+
+                    return (
+                      <div className="space-y-4 pt-4 border-t">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block text-center">Distribución de Capacidad de Flota</span>
+                        <div className="h-[140px] flex items-center justify-center">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={chartData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={40}
+                                outerRadius={55}
+                                paddingAngle={3}
+                                dataKey="value"
+                              >
+                                {chartData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.fill} />
+                                ))}
+                              </Pie>
+                              <Tooltip formatter={(value) => [`${value} uds.`, "Cantidad"]} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div className="flex justify-center gap-4 text-[9px] font-bold">
+                          <div className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-blue-500" />
+                            <span>Utilizada: {totalUtil} uds.</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-red-500" />
+                            <span>Excedente: {totalPot} uds.</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right Column (2 Columns): Opportunity Gap Chart */}
+            <Card className="lg:col-span-2 shadow-sm bg-card/65 backdrop-blur-md border">
+              <CardHeader>
+                <CardTitle className="text-sm font-bold uppercase text-primary">Gráfico de Brecha de Ventas (Revenue Opportunity Gap)</CardTitle>
+                <CardDescription>
+                  Comparativa de Facturación Real vs Proyección al {metaUtilizacion}% sobre Capacidad Instalada y Utilizada.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="h-[320px] pr-4">
+                {(() => {
+                  const data = getFilteredExcelData().map(row => ({
+                    name: row.area.replace("BACHOCO ", "").replace("REFINADOS ", ""),
+                    "Venta Real": Math.round(row.venta),
+                    "Proy. Instalada": Math.round(row.proyInst),
+                    "Proy. Utilizada": Math.round(row.proyUtil),
+                  }));
+
+                  return (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={data} margin={{ top: 10, right: 10, left: 25, bottom: 30 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" strokeOpacity={0.05} />
+                        <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 7.5 }} angle={-25} textAnchor="end" interval={0} height={65} />
+                        <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8.5 }} tickFormatter={(val: number) => `$${(val / 1000000).toFixed(1)}M`} />
+                        <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '11px' }} formatter={(value: any) => [formatUSD(value), ""]} />
+                        <Legend wrapperStyle={{ fontSize: '9px', marginTop: '-10px' }} />
+                        <Bar dataKey="Venta Real" fill="#475569" maxBarSize={16} />
+                        <Bar dataKey="Proy. Instalada" fill="#10B981" maxBarSize={16} />
+                        <Bar dataKey="Proy. Utilizada" fill="#8B5CF6" maxBarSize={16} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Excel Detailed Grid table */}
+          <Card className="shadow-sm bg-card/65 backdrop-blur-md border overflow-hidden">
+            <CardHeader className="pb-3 border-b border-border/10">
+              <CardTitle className="text-sm font-bold uppercase text-primary flex items-center justify-between">
+                <span>Desglose de Capacidad y Facturación Proyectada (Simulación Mayo 2026)</span>
+                <span className="text-[10px] text-muted-foreground font-mono">Fórmulas del Excel Integradas</span>
+              </CardTitle>
+            </CardHeader>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px] text-left text-foreground">
+                <thead className="bg-muted/50 text-[9px] uppercase tracking-wider text-muted-foreground border-b border-border/15">
+                  <tr>
+                    <th className="px-3 py-2">Área</th>
+                    <th className="px-3 py-2 text-right">Venta Mensual</th>
+                    <th className="px-3 py-2 text-right">Prom. Unidad</th>
+                    <th className="px-3 py-2 text-right">Util. Samsara</th>
+                    <th className="px-3 py-2 text-right">Util. 24h (Doble)</th>
+                    <th className="px-3 py-2 text-right">Util. Calc.</th>
+                    <th className="px-3 py-2 text-right">Cap. Inst.</th>
+                    <th className="px-3 py-2 text-right">Cap. Util.</th>
+                    <th className="px-3 py-2 text-right">Cap. Pot.</th>
+                    <th className="px-3 py-2 text-right">Util. Activos</th>
+                    <th className="px-3 py-2 text-right text-success-foreground bg-success/5 border-l border-r border-border/15">Proy. Venta (Instalada)</th>
+                    <th className="px-3 py-2 text-right text-primary-glow bg-primary/5">Proy. Venta (Utilizada)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/10">
+                  {(() => {
+                    const data = getFilteredExcelData();
+                    
+                    const totalVenta = data.reduce((sum, r) => sum + r.venta, 0);
+                    const totalCapInst = data.reduce((sum, r) => sum + r.capInst, 0);
+                    const totalCapUtil = data.reduce((sum, r) => sum + r.capUtil, 0);
+                    const totalCapPot = Math.max(0, totalCapInst - totalCapUtil);
+                    
+                    const avgPromUnidad = totalCapUtil > 0 ? totalVenta / totalCapUtil : 0;
+                    
+                    const avgSamsaraUtil = data.reduce((sum, r) => sum + (r.samsaraUtil * r.capInst), 0) / (totalCapInst || 1);
+                    const avgCalcUtil = data.reduce((sum, r) => sum + (r.calcUtil * r.capUtil), 0) / (totalCapUtil || 1);
+                    const avgActivos = totalCapInst > 0 ? (totalCapUtil / totalCapInst) : 0;
+
+                    const totalProyInst = data.reduce((sum, r) => sum + r.proyInst, 0);
+                    const totalProyUtil = data.reduce((sum, r) => sum + r.proyUtil, 0);
+
+                    return (
+                      <>
+                        {data.map((row, idx) => {
+                          const doubleUtil = row.samsaraUtil * 2;
+                          const activosUtil = row.capInst > 0 ? (row.capUtil / row.capInst) : 0;
+                          
+                          const alertInversion = doubleUtil >= 0.90;
+                          const alertSobra = activosUtil < 0.80;
+
+                          return (
+                            <tr key={idx} className="hover:bg-muted/15 font-mono">
+                              <td className="px-3 py-2 font-bold font-sans text-foreground">{row.area}</td>
+                              <td className="px-3 py-2 text-right text-foreground/90">{formatUSD(row.venta)}</td>
+                              <td className="px-3 py-2 text-right text-muted-foreground">{formatUSD(row.venta / (row.capUtil || 1))}</td>
+                              <td className="px-3 py-2 text-right text-muted-foreground">{(row.samsaraUtil * 100).toFixed(0)}%</td>
+                              <td className="px-3 py-2 text-right">
+                                <span className={cn(
+                                  "px-1.5 py-0.5 rounded text-[9px] font-bold font-sans",
+                                  alertInversion ? "bg-destructive/15 text-destructive" : "bg-success/15 text-success"
+                                )}>
+                                  {(doubleUtil * 100).toFixed(0)}%
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-right text-muted-foreground">{(row.calcUtil * 100).toFixed(0)}%</td>
+                              <td className="px-3 py-2 text-right text-foreground/80">{row.capInst}</td>
+                              <td className="px-3 py-2 text-right text-foreground/80">{row.capUtil}</td>
+                              <td className="px-3 py-2 text-right">
+                                <span className={cn(
+                                  "font-bold",
+                                  (row.capInst - row.capUtil) > 0 ? "text-warning" : "text-muted-foreground/60"
+                                )}>
+                                  {row.capInst - row.capUtil}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                <span className={cn(
+                                  "px-1.5 py-0.5 rounded text-[9px] font-bold font-sans",
+                                  alertSobra ? "bg-warning/15 text-warning" : "bg-success/15 text-success"
+                                )}>
+                                  {(activosUtil * 100).toFixed(0)}%
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-right font-bold text-success bg-success/5 border-l border-r border-border/15">{formatUSD(row.proyInst)}</td>
+                              <td className="px-3 py-2 text-right font-bold text-primary-glow bg-primary/5">{formatUSD(row.proyUtil)}</td>
+                            </tr>
+                          );
+                        })}
+
+                        {/* TOTAL ROW */}
+                        <tr className="bg-muted/30 font-bold border-t-2 border-border/25 font-mono text-xs">
+                          <td className="px-3 py-3 font-sans text-foreground">TOTAL / PROMEDIO</td>
+                          <td className="px-3 py-3 text-right text-foreground">{formatUSD(totalVenta)}</td>
+                          <td className="px-3 py-3 text-right text-muted-foreground">{formatUSD(avgPromUnidad)}</td>
+                          <td className="px-3 py-3 text-right text-muted-foreground">{(avgSamsaraUtil * 100).toFixed(0)}%</td>
+                          <td className="px-3 py-3 text-right text-foreground">{(avgSamsaraUtil * 2 * 100).toFixed(0)}%</td>
+                          <td className="px-3 py-3 text-right text-muted-foreground">{(avgCalcUtil * 100).toFixed(0)}%</td>
+                          <td className="px-3 py-3 text-right text-foreground">{totalCapInst}</td>
+                          <td className="px-3 py-3 text-right text-foreground">{totalCapUtil}</td>
+                          <td className="px-3 py-3 text-right text-warning">{totalCapPot}</td>
+                          <td className="px-3 py-3 text-right text-success">{(avgActivos * 100).toFixed(0)}%</td>
+                          <td className="px-3 py-3 text-right text-success bg-success/10 border-l border-r border-border/25">{formatUSD(totalProyInst)}</td>
+                          <td className="px-3 py-3 text-right text-primary-glow bg-primary/10">{formatUSD(totalProyUtil)}</td>
+                        </tr>
+                      </>
+                    );
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
