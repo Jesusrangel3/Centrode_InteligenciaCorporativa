@@ -181,22 +181,7 @@ function Dashboard() {
 
   const [metaUtilizacion, setMetaUtilizacion] = useState<number>(70);
 
-  const EXCEL_MAYO_DATA = [
-    { area: "BACHOCO CELAYA POL", venta: 16270651.48, capInst: 30, capUtil: 29, samsaraUtil: 0.51, calcUtil: 0.52 },
-    { area: "BACHOCO CELAYA CLIE", venta: 1660458.00, capInst: 2, capUtil: 2, samsaraUtil: 0.55, calcUtil: 0.55 },
-    { area: "BACHOCO AGUAS ALIM", venta: 7858913.40, capInst: 13, capUtil: 13, samsaraUtil: 0.59, calcUtil: 0.59 },
-    { area: "BACHOCO LAGOS POLL", venta: 16805840.70, capInst: 22, capUtil: 18, samsaraUtil: 0.37, calcUtil: 0.45 },
-    { area: "BACHOCO PROCESADO", venta: 7736848.60, capInst: 20, capUtil: 20, samsaraUtil: 0.38, calcUtil: 0.38 },
-    { area: "LUBRICANTES JUMBO", venta: 3712244.00, capInst: 13, capUtil: 9, samsaraUtil: 0.23, calcUtil: 0.33 },
-    { area: "LUBRICANTES FULL", venta: 6905141.60, capInst: 24, capUtil: 19, samsaraUtil: 0.21, calcUtil: 0.26 },
-    { area: "REFINADOS LAZARO", venta: 9584457.08, capInst: 24, capUtil: 21, samsaraUtil: 0.33, calcUtil: 0.36 },
-    { area: "REFINADOS MINATITLA", venta: 14700556.18, capInst: 37, capUtil: 29, samsaraUtil: 0.29, calcUtil: 0.36 },
-    { area: "REFINADOS VERACRUZ", venta: 16333952.40, capInst: 38, capUtil: 36, samsaraUtil: 0.34, calcUtil: 0.35 },
-    { area: "REFINADOS POZA RICA", venta: 7655140.07, capInst: 19, capUtil: 19, samsaraUtil: 0.34, calcUtil: 0.34 },
-    { area: "BULKMATIC", venta: 5155002.86, capInst: 17, capUtil: 17, samsaraUtil: 0.36, calcUtil: 0.36 },
-    { area: "REFRIGERADOS", venta: 4007925.82, capInst: 20, capUtil: 13, samsaraUtil: 0.18, calcUtil: 0.28 },
-    { area: "DCARGO", venta: 546708.97, capInst: 1, capUtil: 1, samsaraUtil: 0.64, calcUtil: 0.64 },
-  ];
+
 
   const getBUOperationType = (buName: string) => {
     if (!buName) return "Dedicado";
@@ -218,16 +203,50 @@ function Dashboard() {
 
   const getFilteredExcelData = () => {
     const factor = MONTH_COEFFICIENTS[monthFilter]?.factor || 1.0;
-    const scale = factor / 0.95;
 
-    return EXCEL_MAYO_DATA.map(row => {
-      const scaledVenta = row.venta * scale;
-      const proyInst = row.samsaraUtil > 0 ? scaledVenta * ((metaUtilizacion / 100) / row.samsaraUtil) : 0;
-      const proyUtil = row.calcUtil > 0 ? scaledVenta * ((metaUtilizacion / 100) / row.calcUtil) : 0;
+    const BU_MAPPING = [
+      { dbKey: "BACHOCO CELAYA", display: "BACHOCO CELAYA POL" },
+      { dbKey: "BACHOCO CLIENTES", display: "BACHOCO CELAYA CLIE" },
+      { dbKey: "BACHOCO AGUASCALIENTES", display: "BACHOCO AGUAS ALIM" },
+      { dbKey: "BACHOCO LAGOS", display: "BACHOCO LAGOS POLL" },
+      { dbKey: "BACHOCO PROCESADO", display: "BACHOCO PROCESADO" },
+      { dbKey: "LUBRICANTES JUMBO", display: "LUBRICANTES JUMBO" },
+      { dbKey: "LUBRICANTES FULL", display: "LUBRICANTES FULL" },
+      { dbKey: "REFINADOS LAZARO", display: "REFINADOS LAZARO" },
+      { dbKey: "REFINADO MINA", display: "REFINADOS MINATITLA" },
+      { dbKey: "REFINADOS VERACRUZ", display: "REFINADOS VERACRUZ" },
+      { dbKey: "REFINADOS POZA RICA", display: "REFINADOS POZA RICA" },
+      { dbKey: "BULKMATIC", display: "BULKMATIC" },
+      { dbKey: "REFRIGERADOS", display: "REFRIGERADOS" },
+      { dbKey: "DRAGON CARGO", display: "DCARGO" },
+    ];
+
+    return BU_MAPPING.map(item => {
+      // Query database tractos for this specific business unit
+      const buTractos = tractos.filter(t => (t.unidadNegocio || "").toUpperCase() === item.dbKey.toUpperCase());
+      
+      const venta = buTractos.reduce((sum, t) => sum + t.ventaPorKm * t.kmRecorridos, 0) * factor;
+      const capInst = buTractos.length;
+      const capUtil = buTractos.filter(t => t.estado === "Activo").length;
+      
+      // Compute Samsara and active utilization averages from database
+      const totalSamsaraUtil = buTractos.reduce((sum, t) => sum + t.utilizacion, 0);
+      const samsaraUtil = capInst > 0 ? (totalSamsaraUtil / capInst) / 100 : 0;
+
+      const activeTractos = buTractos.filter(t => t.estado === "Activo");
+      const totalCalcUtil = activeTractos.reduce((sum, t) => sum + t.utilizacion, 0);
+      const calcUtil = capUtil > 0 ? (totalCalcUtil / capUtil) / 100 : 0;
+
+      const proyInst = samsaraUtil > 0 ? venta * ((metaUtilizacion / 100) / samsaraUtil) : 0;
+      const proyUtil = calcUtil > 0 ? venta * ((metaUtilizacion / 100) / calcUtil) : 0;
 
       return {
-        ...row,
-        venta: scaledVenta,
+        area: item.display,
+        venta,
+        capInst,
+        capUtil,
+        samsaraUtil,
+        calcUtil,
         proyInst,
         proyUtil,
       };
