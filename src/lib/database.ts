@@ -3449,7 +3449,7 @@ export const deleteRemolque = (id: string) => {
 export const formatCurrency = (n: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 }).format(n);
 export const formatUSD = (n: number) =>
-  new Intl.NumberFormat("es-MX", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+  new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 }).format(n);
 
 // Shared client-side real-time sync function
 export const syncAllFromSamsara = async (apiKey: string): Promise<{ success: boolean; matchCount: number; error?: string }> => {

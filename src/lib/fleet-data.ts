@@ -79,4 +79,4 @@ export const unidadesNegocio: UnidadNegocioStats[] = [
 ];
 
 export const formatUSD = (n: number) =>
-  new Intl.NumberFormat("es-MX", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+  new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 }).format(n);

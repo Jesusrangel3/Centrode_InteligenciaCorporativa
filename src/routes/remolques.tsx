@@ -998,14 +998,14 @@ function RemolquesPage() {
                       </div>
                       <div className="flex justify-between pt-1.5 font-bold text-destructive">
                         <span>Pérdida por Inactividad (Downtime):</span>
-                        <span className="tabular-nums">{formatUSD(maint.downtimeCost)} USD</span>
+                        <span className="tabular-nums">{formatUSD(maint.downtimeCost)} MXN</span>
                       </div>
 
                       {maint.riskLevel === "red" && (
                         <div className="bg-destructive/10 border border-destructive/20 text-destructive text-[11px] rounded-lg p-3 mt-2 space-y-1">
                           <p className="font-bold flex items-center gap-1">⚠️ ALERTA DE RENOVACIÓN DE ACTIVO</p>
                           <p className="text-[10px] leading-relaxed text-muted-foreground/90">
-                            La inactividad prolongada ({selectedRemolque.diasTaller} días) y pérdidas por downtime ({formatUSD(maint.downtimeCost)} USD) sugieren obsolescencia de remolque. Se recomienda evaluar reemplazo por Leasing para mantener disponibilidad de fletes Bachoco / Refinados.
+                            La inactividad prolongada ({selectedRemolque.diasTaller} días) y pérdidas por downtime ({formatUSD(maint.downtimeCost)} MXN) sugieren obsolescencia de remolque. Se recomienda evaluar reemplazo por Leasing para mantener disponibilidad de fletes Bachoco / Refinados.
                           </p>
                         </div>
                       )}

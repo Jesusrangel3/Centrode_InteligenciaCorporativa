@@ -1307,7 +1307,7 @@ function Dashboard() {
                   <div className="mt-2 flex items-center gap-4">
                     <p className="text-3xl font-black font-display text-primary tracking-tight flex items-baseline gap-1.5">
                       {formatUSD(totalRevenue)}
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-sans">USD</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-sans">MXN</span>
                     </p>
                     <Sparkline values={[142000, 156000, 168000, 175000, 171000, 188000]} color="var(--primary)" />
                   </div>
@@ -1332,7 +1332,7 @@ function Dashboard() {
                   <div className="mt-2 flex items-center gap-4">
                     <p className="text-3xl font-black font-display text-success tracking-tight flex items-baseline gap-1.5">
                       {formatUSD(totalUtility)}
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-sans">USD</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-sans">MXN</span>
                     </p>
                     <Sparkline values={[38000, 42500, 47800, 51200, 49600, 56400]} color="var(--success)" />
                   </div>
@@ -1998,7 +1998,7 @@ function Dashboard() {
                   </div>
                   <div className="flex items-baseline gap-1">
                     <span className="text-lg font-black text-foreground">{formatUSD(filteredTractos.filter(t => t.estado === "Activo").length * 85)}</span>
-                    <span className="text-[9px] text-muted-foreground uppercase font-semibold">USD / Mes</span>
+                    <span className="text-[9px] text-muted-foreground uppercase font-semibold">MXN / Mes</span>
                   </div>
                   <p className="text-[9px] text-muted-foreground leading-normal">
                     Reduciendo ralentí excesivo actual de 22 minutos a un estándar de 8 minutos en Celaya/Veracruz.
